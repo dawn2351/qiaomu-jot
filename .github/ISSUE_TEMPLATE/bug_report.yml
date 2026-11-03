@@ -1,0 +1,29 @@
+name: 问题反馈 / Bug report
+description: 某个功能不按预期工作 · Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 做了什么操作，期望什么，实际得到什么。截图很有帮助。
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: 从哪个 App 收录 / Source app
+      placeholder: Chrome / 微信 / 预览 / 访达 …
+  - type: input
+    id: versions
+    attributes:
+      label: 版本 / Versions
+      description: 乔木闪记版本（设置 → 关于）与 macOS 版本
+      placeholder: Jot 1.4.0 · macOS 26.1
+    validations:
+      required: true
+  - type: dropdown
+    id: folder
+    attributes:
+      label: 保存位置类型 / Save location
+      options: [Obsidian 仓库 / Obsidian vault, 普通文件夹 / Plain folder]

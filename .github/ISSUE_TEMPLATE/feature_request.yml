@@ -1,0 +1,15 @@
+name: 功能建议 / Feature request
+description: 想要的新能力 · Suggest an idea
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景 / Scenario
+      description: 你想在什么时候、从哪里收录什么？现在卡在哪？
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 期望的样子 / What you'd like
