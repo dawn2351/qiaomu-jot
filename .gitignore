@@ -1,0 +1,13 @@
+# SwiftPM / Xcode
+.build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# Build outputs (app bundle, DMG, dmgbuild venv)
+build/
+dist/
+
+# macOS
+.DS_Store
