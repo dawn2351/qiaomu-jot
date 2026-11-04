@@ -72,6 +72,7 @@ enum SettingsWindow {
             tabs.addTabViewItem(item)
         }
         tab("通用", "gearshape", GeneralSettings())
+        tab("场景", "rectangle.stack", RecipeSettings())
         tab("记录", "text.quote", RecordSettings())
         tab("保存", "tray.and.arrow.down", SaveSettings())
         tab("关于", "info.circle", AboutSettings())
@@ -96,8 +97,29 @@ struct GeneralSettings: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var trusted = AXIsProcessTrusted()
 
+    private var onboardingDone: Bool { prefs.vaultExists && trusted && prefs.didFirstCapture }
+
     var body: some View {
         Form {
+            if !prefs.onboardingDismissed && !onboardingDone {
+                Section {
+                    OnboardingStep(n: 1, title: "选择保存位置", detail: "Obsidian 仓库或任意文件夹", done: prefs.vaultExists,
+                                   action: ("选择…", chooseVault))
+                    OnboardingStep(n: 2, title: "开启「辅助功能」", detail: "用来读取其他 App 里选中的内容", done: trusted,
+                                   action: ("去开启…", {
+                                       _ = SelectionGrabber.ensureAccessibility(prompt: true)
+                                       NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                                   }))
+                    OnboardingStep(n: 3, title: "试一次", detail: "在任意 App 按 \(KeyboardShortcuts.getShortcut(for: .capture)?.description ?? "打开输入框的快捷键")，写一句话，按 ⌘↩ 保存", done: prefs.didFirstCapture,
+                                   action: ("现在试试", { (NSApp.delegate as? AppDelegate)?.toggle() }))
+                } header: {
+                    HStack {
+                        Text("开始使用")
+                        Spacer()
+                        Button("不再显示") { prefs.onboardingDismissed = true }.buttonStyle(.borderless).font(.caption)
+                    }
+                }
+            }
             Section {
                 HStack(spacing: 12) {
                     Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 44, height: 44)
@@ -109,7 +131,7 @@ struct GeneralSettings: View {
                     if trusted {
                         Label("权限已就绪", systemImage: "checkmark.circle.fill")
                             .font(.caption).foregroundStyle(.secondary)
-                    } else {
+                    } else if prefs.onboardingDismissed || onboardingDone {
                         Button("开启辅助功能…") {
                             _ = SelectionGrabber.ensureAccessibility(prompt: true)
                             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
@@ -173,7 +195,7 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: prefs.isObsidianVault ? 450 : 540)
+        .frame(width: settingsWidth, height: (prefs.isObsidianVault ? 450 : 540) + (!prefs.onboardingDismissed && !onboardingDone ? 190 : 0))
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in trusted = AXIsProcessTrusted() }
         .onAppear {
             folders = prefs.knownFolders
@@ -190,6 +212,32 @@ struct GeneralSettings: View {
             prefs.vaultPath = u.path
             folders = prefs.knownFolders
         }
+    }
+}
+
+private struct OnboardingStep: View {
+    let n: Int
+    let title: String
+    let detail: String
+    let done: Bool
+    let action: (String, () -> Void)
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(done ? Color.primary : Color.primary.opacity(0.08)).frame(width: 22, height: 22)
+                if done { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Color(nsColor: .windowBackgroundColor)) }
+                else { Text("\(n)").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary) }
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 13, weight: .medium)).strikethrough(done, color: .secondary)
+                    .foregroundStyle(done ? .secondary : .primary)
+                Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !done { Button(action.0, action: action.1).controlSize(.small) }
+        }
+        .animation(.easeOut(duration: 0.2), value: done)
     }
 }
 
@@ -515,11 +563,12 @@ struct AboutSettings: View {
                 Spacer(minLength: 0)
             }
             HStack(spacing: 8) {
-                AboutAction(title: "下载新版", symbol: "arrow.down.circle", url: Links.releases)
+                AboutAction(title: "检查更新", symbol: "arrow.triangle.2.circlepath") { Updater.shared.checkForUpdates() }
                 AboutAction(title: "反馈问题", symbol: "ladybug", url: Links.issues)
                 AboutAction(title: "使用说明", symbol: "book", url: Links.readme)
                 AboutAction(title: "源代码", symbol: "chevron.left.forwardslash.chevron.right", url: Links.repo)
             }
+            AutoUpdateToggle()
             HStack(spacing: 14) {
                 QRCard(image: "wechat-qr.jpg", title: "关注公众号", symbol: "newspaper", hint: "微信搜索「向阳乔木推荐看」")
                 QRCard(image: "reward-qr.png", title: "请我喝杯咖啡", symbol: "cup.and.saucer", hint: "微信扫码，支持持续更新")
@@ -548,10 +597,15 @@ struct AboutSettings: View {
 private struct AboutAction: View {
     let title: String
     let symbol: String
-    let url: URL
+    var url: URL? = nil
+    var action: (() -> Void)? = nil
     @State private var hover = false
+
+    init(title: String, symbol: String, url: URL) { self.title = title; self.symbol = symbol; self.url = url }
+    init(title: String, symbol: String, action: @escaping () -> Void) { self.title = title; self.symbol = symbol; self.action = action }
+
     var body: some View {
-        Link(destination: url) {
+        Button { if let action { action() } else if let url { NSWorkspace.shared.open(url) } } label: {
             Label(title, systemImage: symbol)
                 .font(.system(size: 12, weight: .medium))
                 .frame(maxWidth: .infinity).frame(height: 30)
@@ -561,6 +615,16 @@ private struct AboutAction: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+    }
+}
+
+private struct AutoUpdateToggle: View {
+    @State private var on = Updater.shared.automaticallyChecks
+    var body: some View {
+        Toggle("自动检查更新（有新版时在菜单栏旁提示，不打断你）", isOn: $on)
+            .toggleStyle(.checkbox).font(.system(size: 12)).foregroundStyle(.secondary)
+            .onChange(of: on) { Updater.shared.automaticallyChecks = $0 }
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

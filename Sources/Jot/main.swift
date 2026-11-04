@@ -9,6 +9,13 @@ final class CapturePanel: NSPanel {
     var onCancel: (() -> Void)?
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
+    /// The panel never activates the app, and then AppKit skips the menu key-equivalent pass for whatever
+    /// has focus (e.g. right after opening). Run it ourselves for every ⌘ chord first.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, event.modifierFlags.contains(.command), performKeyEquivalent(with: event) { return }
+        super.sendEvent(event)
+    }
+
     /// A menu bar app has no Edit menu, so ⌘V/⌘C/⌘X/⌘A/⌘Z would never reach the text view.
     override func performKeyEquivalent(with e: NSEvent) -> Bool {
         if super.performKeyEquivalent(with: e) { return true }
@@ -56,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         submenu(AppInfo.name, [
             item("关于 \(AppInfo.name)", #selector(showAbout), "", target: self),
+            item("检查更新…", #selector(Updater.checkForUpdates), "", target: Updater.shared),
             .separator(),
             item("设置…", #selector(showSettings), ",", target: self),
             .separator(),
@@ -85,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         Theme.registerFonts()
         installMainMenu()
         ClipboardWatcher.shared.start()
+        Updater.shared.start()
         // Keep the login item pointing at this copy of the app (it may have been moved or renamed).
         if Prefs.shared.launchAtLogin, SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -104,6 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         KeyboardShortcuts.onKeyUp(for: .capture) { [weak self] in self?.toggle() }
         KeyboardShortcuts.onKeyUp(for: .quickSave) { [weak self] in self?.quickSave() }
+        registerRecipes()
+        NotificationCenter.default.addObserver(forName: .recipesChanged, object: nil, queue: .main) { [weak self] _ in
+            self?.registerRecipes()
+        }
 
         if Prefs.shared.vaultPath.isEmpty {
             // No Obsidian vault: work as a plain Markdown notebook in ~/Documents/乔木闪记.
@@ -129,16 +142,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return true
     }
 
-    @objc func showAbout() {
+    @objc func showAbout() { openSettings(tab: "关于") }
+    @objc func showScenes() { openSettings(tab: "场景") }
+
+    private func openSettings(tab label: String) {
         showSettings()
-        (settingsWindow?.contentViewController as? NSTabViewController)?.selectedTabViewItemIndex = 3
+        if let tabs = settingsWindow?.contentViewController as? NSTabViewController,
+           let i = tabs.tabViewItems.firstIndex(where: { $0.label == label }) { tabs.selectedTabViewItemIndex = i }
     }
 
-    /// ⌘⇧J: open the panel; anything selected in the frontmost app comes along as a quote.
-    @objc func toggle() {
+    // MARK: Scenes
+
+    private var registeredRecipeIDs: [String] = []
+
+    /// One global shortcut per scene; re-registered whenever scenes change.
+    private func registerRecipes() {
+        for id in registeredRecipeIDs { KeyboardShortcuts.removeHandler(for: .init("recipe-\(id)")) }
+        let recipes = Prefs.shared.recipes
+        registeredRecipeIDs = recipes.map(\.id)
+        for r in recipes {
+            KeyboardShortcuts.onKeyUp(for: r.shortcutName) { [weak self] in
+                // Look the scene up again: it may have been edited since registration.
+                guard let current = Prefs.shared.recipes.first(where: { $0.id == r.id }) else { return }
+                self?.run(current)
+            }
+        }
+    }
+
+    func run(_ recipe: Recipe) {
+        switch recipe.mode {
+        case .panel: toggle(recipe: recipe)
+        case .capture: quickSave(recipe: recipe)
+        }
+    }
+
+    @objc func toggle() { toggle(recipe: nil) }
+
+    /// ⌘⇧J (or a scene): open the panel; anything selected in the frontmost app comes along as a quote.
+    func toggle(recipe: Recipe?) {
         if let p = panel, p.isVisible { close(); return }
         guard AXIsProcessTrusted(), let ctx = SourceContext.current(), !ctx.isPrivate, !AX.focusIsSecureField() else {
-            show(); return
+            show(); model?.apply(recipe); return
         }
         SelectionGrabber.grab(ctx, timeout: 0.3) { [weak self] g in
             let captured = g.isEmpty || g.concealed ? nil : CaptureFormatter.compose(g, ctx)
@@ -149,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 if s.url != nil || s.detail != nil { suggested = s }
             }
             self?.show(prefill: captured, suggestedSource: suggested)
+            self?.model?.apply(recipe)
             if captured == nil, let clip = ClipboardWatcher.shared.clip(within: 300),
                clip.grabbed.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let model = self?.model {
                 model.clipOffer = CaptureModel.ClipOffer(label: "附上剪贴板里的\(clip.kindLabel)") { [weak model] in
@@ -257,7 +302,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     /// ⌘⇧K: save the selection straight away. Pressed again while the toast shows, it opens the
     /// panel to add a thought under the entry just saved.
-    @objc func quickSave() {
+    /// Shown when macOS blocks reading a file another app keeps in its private storage.
+    static let protectedHint = "它在其他 App 的受保护位置，可在原 App 里拖进输入框或另存后再收录"
+
+    @objc func quickSave() { quickSave(recipe: nil) }
+
+    /// ⌘⇧K (or a "直接收录" scene): save the selection straight away. Pressed again while the toast shows,
+    /// it opens the panel to add a thought under the entry just saved.
+    func quickSave(recipe: Recipe?) {
         if Toast.isShowingCapture, let last = History.last { Toast.dismiss(); show(amend: last); return }
         guard let vault = Prefs.shared.vaultURL else { showSettings(); return }
         guard SelectionGrabber.ensureAccessibility() else {
@@ -276,7 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             guard let self else { return }
             if g.concealed { Toast.show("这是受保护的内容，未收录", detail: ctx.appName, style: .warning); return }
             var result = CaptureFormatter.Result(markdown: "", files: [], tempDirs: [], source: nil)
-            var title = "已收录到今日日记"
+            var title = recipe.map { "已收录到「\($0.displayName)」" } ?? "已收录到今日日记"
             var toastSource: SourceInfo? = SourceInfo(ctx)
             var detail = ctx.kind == .browser ? ctx.pageTitle : nil
             if g.isEmpty {
@@ -315,17 +367,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             } else {
                 result = CaptureFormatter.compose(g, ctx)
             }
+            if let recipe { title = "已收录到「\(recipe.displayName)」" }
             let prefs = Prefs.shared
             let finish = { [weak self] (ocr: [String: String]) in
                 let w = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder)
                 defer { for d in result.tempDirs { try? FileManager.default.removeItem(at: d) } }
+                History.skipped = []
                 do {
-                    let note = try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
-                                            source: result.source, heading: prefs.insertHeading)
-                    _ = prefs.dailyCount(1)
+                    let dest = recipe?.destination ?? .daily
+                    let note: URL
+                    switch dest.kind {
+                    case .daily:
+                        note = try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
+                                            source: result.source, asTask: recipe?.asTask ?? false, heading: prefs.insertHeading)
+                        _ = prefs.dailyCount(1)
+                    case .note:
+                        note = try w.append(content: result.markdown, attachments: result.files, ocr: ocr, source: result.source,
+                                            asTask: recipe?.asTask ?? false, to: vault.appendingPathComponent(dest.path))
+                    case .folder:
+                        note = try w.createNote(folder: dest.path, title: NoteNaming.autoTitle(from: result.markdown),
+                                                content: result.markdown, attachments: result.files, ocr: ocr, source: result.source)
+                    }
+                    let skipped = History.skipped
+                    if !skipped.isEmpty, skipped.count == result.files.count,
+                       result.markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        try? History.undoLast()          // nothing usable was saved: don't leave an empty entry
+                        Toast.show("这个文件读不到，没有收录", detail: Self.protectedHint, style: .warning, duration: 6)
+                        return
+                    }
+                    prefs.didFirstCapture = true
                     if prefs.openAfterSave { CaptureModel.open(note: note, vault: vault) }
                     SaveSound.play(prefs.saveSound)
                     NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                    if !skipped.isEmpty {
+                        Toast.show("已收录，但有 \(skipped.count) 个文件读不到", detail: Self.protectedHint, style: .warning, actions: [
+                            .init(title: "撤销") { self?.undoLast() },
+                        ], duration: 6)
+                        return
+                    }
                     Toast.show(title, detail: detail, source: toastSource, actions: [
                         .init(title: "撤销") { self?.undoLast() },
                         .init(title: "补充想法") { History.last.map { self?.show(amend: $0) } },
@@ -361,8 +440,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             warn.attributedTitle = NSAttributedString(string: warn.title, attributes: [.foregroundColor: NSColor.systemOrange])
             menu.addItem(.separator())
         }
-        add("打开输入框", #selector(toggle), symbol: "square.and.pencil").setShortcut(for: .capture)
-        add("收录选中内容", #selector(quickSave), symbol: "text.badge.plus").setShortcut(for: .quickSave)
+        add("打开输入框", #selector(toggle as () -> Void), symbol: "square.and.pencil").setShortcut(for: .capture)
+        add("收录选中内容", #selector(quickSave as () -> Void), symbol: "text.badge.plus").setShortcut(for: .quickSave)
+        let scenes = Prefs.shared.recipes
+        if !scenes.isEmpty {
+            menu.addItem(.separator())
+            for r in scenes {
+                let item = MenuAction.item(r.displayName) { [weak self] in self?.run(r) }
+                item.image = NSImage(systemSymbolName: r.symbol, accessibilityDescription: nil)
+                item.toolTip = (r.mode == .panel ? "打开输入框 → " : "直接收录 → ") + r.destinationLabel
+                item.setShortcut(for: r.shortcutName)
+                menu.addItem(item)
+            }
+        }
+        add(scenes.isEmpty ? "添加场景…" : "管理场景…", #selector(showScenes), symbol: scenes.isEmpty ? "plus.rectangle.on.rectangle" : "rectangle.stack")
         menu.addItem(.separator())
 
         let recents = RecentCaptures.items
@@ -388,6 +479,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.addItem(.separator())
         add("设置…", #selector(showSettings), symbol: "gearshape", key: ",")
         add("关于 \(AppInfo.name)", #selector(showAbout), symbol: "info.circle")
+        let upd = menu.addItem(withTitle: "检查更新…", action: #selector(Updater.checkForUpdates), keyEquivalent: "")
+        upd.target = Updater.shared
+        upd.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: "退出 \(AppInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
@@ -455,17 +549,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 func snapshot(_ path: String, text: String, dark: Bool) {
     let p = Prefs.shared
     let keep = (p.showFormatBar, p.timestamp, p.timeFormat)
-    defer { (p.showFormatBar, p.timestamp, p.timeFormat) = keep }   // design snapshots must not change the user's prefs
+    let keepRecipes = UserDefaults.standard.data(forKey: "recipes")
+    defer {
+        (p.showFormatBar, p.timestamp, p.timeFormat) = keep
+        UserDefaults.standard.set(keepRecipes, forKey: "recipes")
+    }
+    if CommandLine.arguments.contains("--scenes-demo") {
+        var a = Recipe.presets[0], b = Recipe.presets[2]
+        a.id = "demo-a"; b.id = "demo-b"
+        p.recipes = [a, b]
+    }   // design snapshots must not change the user's prefs
     if CommandLine.arguments.contains("--time-custom") { p.timestamp = true; p.timeFormat = "[记于] HH:mm" }
     let m = CaptureModel(); m.text = text
     let args = CommandLine.arguments
     m.showFormatBar = args.contains("--format")
     if args.contains("--picker") {
-        m.vaultIndex = ["", "Inbox", "读书", "工作", "10 Daily", "读书/经济"].map { Destination(kind: .folder, path: $0) }
-            + ["读书/置身事内.md", "读书/经济/置身事内 笔记.md", "工作/周报.md"].map { Destination(kind: .note, path: $0) }
+        m.vaultIndex = (["", "Inbox", "读书", "工作", "10 Daily", "读书/经济"].map { Destination(kind: .folder, path: $0) }
+            + ["读书/置身事内.md", "读书/经济/置身事内 笔记.md", "工作/周报.md"].map { Destination(kind: .note, path: $0) })
+            .map { VaultIndex.entry($0) }
         m.indexLoaded = true
         m.picking = true
-        if let q = args.firstIndex(of: "--query").map({ args[$0 + 1] }) { m.pickerQuery = q }
+        if let q = args.firstIndex(of: "--query").map({ args[$0 + 1] }) {
+            m.pickerQuery = q
+            m.contentHits = [(Destination(kind: .note, path: "10 Daily/2026-11-02.md"), "看完第三章：地方政府与置身事内的逻辑…"),
+                             (Destination(kind: .note, path: "Clippings/兰小欢访谈.md"), "…为什么写《置身事内》这本书")]
+        }
     }
     if args.contains("--recents") {
         m.previewRecents = [
@@ -488,6 +596,7 @@ func snapshot(_ path: String, text: String, dark: Bool) {
     let settingsTab = args.firstIndex(of: "--settings").map { args[$0 + 1] }
     let host: NSView = settingsTab != nil
         ? (settingsTab == "about" ? NSHostingView(rootView: AnyView(AboutSettings()))
+           : settingsTab == "scenes" ? NSHostingView(rootView: AnyView(RecipeSettings()))
            : settingsTab == "record" ? NSHostingView(rootView: AnyView(RecordSettings()))
            : settingsTab == "save" ? NSHostingView(rootView: AnyView(SaveSettings()))
            : NSHostingView(rootView: AnyView(GeneralSettings())))
@@ -623,9 +732,27 @@ func selftest() -> Int32 {
     check("name: fallback", String(NoteNaming.autoTitle(from: "").prefix(3)), "随记 ")
     let idx = [Destination(kind: .note, path: "Inbox/置身事内 笔记.md"), Destination(kind: .folder, path: "读书"),
                Destination(kind: .note, path: "读书/置身事内.md"), Destination(kind: .note, path: "工作/周报.md")]
-    check("search: name prefix first", VaultIndex.search(idx, "置身").map(\.path).joined(separator: ","),
+    check("search: name prefix first", VaultIndex.search(idx.map { VaultIndex.entry($0) }, "置身").map(\.path).joined(separator: ","),
           "读书/置身事内.md,Inbox/置身事内 笔记.md")
-    check("search: multi-word", VaultIndex.search(idx, "读书 置身").map(\.path).joined(separator: ","), "读书/置身事内.md")
+    let ix = idx.map { VaultIndex.entry($0) } + [VaultIndex.entry(Destination(kind: .note, path: "资料/Large Language Models.md"), aliases: ["LLM 入门"])]
+    check("search: multi-word", VaultIndex.search(ix, "读书 置身").map(\.path).joined(separator: ","), "读书/置身事内.md")
+    check("search: pinyin initials", VaultIndex.search(ix, "zssn").first?.path ?? "", "读书/置身事内.md")
+    check("search: full pinyin", VaultIndex.search(ix, "zhoubao").first?.path ?? "", "工作/周报.md")
+    check("search: fuzzy typo-tolerant order", VaultIndex.search(ix, "lgmdl").first?.path ?? "", "资料/Large Language Models.md")
+    check("search: alias", VaultIndex.search(ix, "llm").first?.path ?? "", "资料/Large Language Models.md")
+    let ix2 = ix + [VaultIndex.entry(Destination(kind: .note, path: "活动/一技半解·圆桌｜Personal Agent.md")),
+                    VaultIndex.entry(Destination(kind: .note, path: "读书/三国演义 (罗贯中) (z-library.sk, 1lib.sk).md"))]
+    for q in ["yiji", "yi'ji", "yi ji", "yjbj"] {
+        check("search: pinyin \(q) ranks best match first", VaultIndex.search(ix2, q).first?.path ?? "", "活动/一技半解·圆桌｜Personal Agent.md")
+    }
+    let fm = FileManager.default.temporaryDirectory.appendingPathComponent("qob-fm-\(UUID().uuidString).md")
+    defer { try? FileManager.default.removeItem(at: fm) }
+    try? "---\ntitle: x\naliases:\n  - 置身\n  - \"Inside\"\n---\n正文".write(to: fm, atomically: true, encoding: .utf8)
+    check("aliases: block list", VaultIndex.aliases(of: fm).joined(separator: ","), "置身,Inside")
+    try? "---\naliases: [甲, 乙]\n---".write(to: fm, atomically: true, encoding: .utf8)
+    check("aliases: inline list", VaultIndex.aliases(of: fm).joined(separator: ","), "甲,乙")
+    try? "开头\n## 第二章 土地财政是关键机制，后面还有很长很长很长很长很长很长的内容".write(to: fm, atomically: true, encoding: .utf8)
+    check("content snippet", ContentSearch.snippet(in: fm, for: "土地财政") ?? "", "第二章 土地财政是关键机制，后面还有很长很长很长很长很长很长的内容")
 
     // Drops arrive through real pasteboards.
     let dm = CaptureModel()
@@ -745,11 +872,57 @@ func selftest() -> Int32 {
     nextShot.map(ScreenshotFinder.consume)
     check("screenshot: ignores other files", String(ScreenshotFinder.latest(in: shots) == nil), "true")
 
+    // Scenes
+    check("scene parse: note", Recipe.parse("Inbox/灵感").map { "\($0.kind.rawValue):\($0.path)" } ?? "", "note:Inbox/灵感.md")
+    check("scene parse: note .md", Recipe.parse("待办.md").map { "\($0.kind.rawValue):\($0.path)" } ?? "", "note:待办.md")
+    check("scene parse: folder", Recipe.parse("读书/").map { "\($0.kind.rawValue):\($0.path)" } ?? "", "folder:读书")
+    check("scene parse: label roundtrip", Recipe.parse(Recipe.label(Destination(kind: .folder, path: "读书"))).map(\.path) ?? "", "读书")
+    check("scene parse: daily", Recipe.parse("今日日记")?.kind.rawValue ?? "", "daily")
+    let encoded = try? JSONEncoder().encode(Recipe.presets)
+    check("scene presets roundtrip", (encoded.flatMap { try? JSONDecoder().decode([Recipe].self, from: $0) })?.map(\.name).joined(separator: ",") ?? "",
+          "灵感,待办,读书摘录,稍后读,工作日志")
+
+    // WeChat-style copy: a link into another app's container plus the image data → use the data.
+    let wpb = NSPasteboard.withUniqueName()
+    let item2 = NSPasteboardItem()
+    item2.setString("file:///Users/x/Library/Containers/com.tencent.xinWeChat/Data/tmp/ae980d29.attachments", forType: .fileURL)
+    item2.setData(Data([0x89, 0x50, 0x4E, 0x47]), forType: .png)
+    wpb.writeObjects([item2])
+    let wg = SelectionGrabber.read(wpb)
+    check("container link with image data → data", "\(wg.files.count) files, \(wg.media.count) media", "0 files, 1 media")
+    wpb.releaseGlobally()
+    // An unreadable attachment is skipped, the rest of the capture is kept.
+    let sv = FileManager.default.temporaryDirectory.appendingPathComponent("qob-skip-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: sv) }
+    History.skipped = []
+    let sw = DailyNoteWriter(vault: sv, attachmentOverride: "", format: fmt(.plain, time: false, source: false))
+    let sn = try? sw.append(content: "文字还在", attachments: [URL(fileURLWithPath: "/nonexistent/protected.png")])
+    check("unreadable attachment skipped", (sn.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "") + "|" + History.skipped.joined(), "文字还在\n|protected.png")
+
     check("link title: og:title", LinkTitle.parse("<head><meta property=\"og:title\" content=\"置身事内 &amp; 读书\"><title>x</title>") ?? "", "置身事内 & 读书")
     check("link title: <title>", LinkTitle.parse("<title>\n  Hello &#x4E16;&#30028; \n</title>") ?? "", "Hello 世界")
 
     print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
     return failures == 0 ? 0 : 1
+}
+
+/// `Jot --search <vault> <query>`: run the picker's search (names + Spotlight contents) from the shell.
+if let i = CommandLine.arguments.firstIndex(of: "--search"), i + 2 < CommandLine.arguments.count {
+    let vault = URL(fileURLWithPath: CommandLine.arguments[i + 1]), q = CommandLine.arguments[i + 2]
+    let t0 = Date()
+    let idx = VaultIndex.scan(vault)
+    print("indexed \(idx.count) items in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+    for d in VaultIndex.search(idx, q).prefix(8) { print("  name   ", d.path) }
+    var done = false
+    let cs = ContentSearch()
+    let t1 = Date()
+    cs.run(q, in: vault) { hits in
+        print("content (\(Int(Date().timeIntervalSince(t1) * 1000)) ms):")
+        for (d, snip) in hits.prefix(8) { print("  ", d.path, "—", snip) }
+        done = true
+    }
+    while !done && Date().timeIntervalSince(t1) < 10 { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    exit(0)
 }
 
 if CommandLine.arguments.contains("--selftest") {

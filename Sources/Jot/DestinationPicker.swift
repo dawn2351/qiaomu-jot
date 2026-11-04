@@ -10,36 +10,40 @@ struct DestinationPicker: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.subtle)
-                SearchField(text: $model.pickerQuery, placeholder: "搜索文件夹或笔记…",
+                SearchField(text: $model.pickerQuery, placeholder: "搜索笔记、文件夹或内容（支持拼音）…",
                             onMove: { model.movePicker($0) }, onSubmit: { model.choosePicked() },
                             onCancel: { model.closePicker() })
                     .frame(height: 22)
-                Kbd("esc")
+                Button { model.closePicker() } label: { Kbd("esc") }
+                    .buttonStyle(.plain).help("返回（Esc）")
             }
             .padding(.horizontal, 20).frame(height: 52)
             Rectangle().fill(Theme.border).frame(height: 1)
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 1) {
+                    // Eager VStack (≤ ~70 rows): LazyVStack kept stale rows when results changed in quick succession.
+                    VStack(alignment: .leading, spacing: 1) {
                         ForEach(model.pickerRows) { row in
                             switch row.kind {
                             case .header(let title):
                                 Text(title).font(Theme.sans(11, .medium)).foregroundStyle(Theme.subtle)
                                     .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
-                            case .item(let i, let d, let date):
+                            case .item(let i, let item):
+                                let d = item.destination
                                 DestinationRow(destination: d, selected: i == model.pickerSelection,
-                                               current: d == model.destination, date: date)
+                                               current: d == model.destination, date: item.date, snippet: item.snippet)
                                     .id(i)
                                     .onTapGesture { model.choose(d) }
                             }
                         }
                         if model.pickerRows.isEmpty {
-                            Text(model.indexLoaded ? "没有匹配的文件夹或笔记" : "正在读取仓库…")
+                            Text(model.indexLoaded ? "没有匹配的文件夹或笔记" : "正在读取…")
                                 .font(Theme.sans(13)).foregroundStyle(Theme.subtle)
                                 .frame(maxWidth: .infinity).padding(.vertical, 40)
                         }
                     }
                     .padding(.horizontal, 8).padding(.vertical, 6)
+                    .id(model.pickerQuery)      // a new query is a new list
                 }
                 .frame(height: 300)
                 .onChange(of: model.pickerSelection) { i in proxy.scrollTo(i) }
@@ -48,7 +52,7 @@ struct DestinationPicker: View {
             HStack(spacing: 14) {
                 keyHint("↑↓", "选择")
                 keyHint("↩", "确定")
-                keyHint("esc", "返回")
+                Button { model.closePicker() } label: { keyHint("esc", "返回") }.buttonStyle(.plain)
                 Spacer()
                 Text("选笔记追加到末尾，选文件夹新建笔记").font(Theme.sans(11)).foregroundStyle(Theme.subtle)
             }
@@ -69,6 +73,7 @@ private struct DestinationRow: View {
     let selected: Bool
     let current: Bool
     var date: Date? = nil
+    var snippet: String? = nil
 
     private static let relative: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter(); f.unitsStyle = .short; return f
@@ -81,7 +86,9 @@ private struct DestinationRow: View {
                 .foregroundStyle(selected ? Theme.text : Theme.muted).frame(width: 16)
             Text(destination.kind == .daily ? "今日日记" : destination.name)
                 .font(Theme.sans(13, .medium)).foregroundStyle(Theme.text).lineLimit(1)
-            if !destination.parent.isEmpty {
+            if let snippet, !snippet.isEmpty {
+                Text(snippet).font(Theme.sans(12)).foregroundStyle(Theme.subtle).lineLimit(1).truncationMode(.tail)
+            } else if !destination.parent.isEmpty {
                 Text(destination.parent).font(Theme.sans(12)).foregroundStyle(Theme.subtle)
                     .lineLimit(1).truncationMode(.head)
             }

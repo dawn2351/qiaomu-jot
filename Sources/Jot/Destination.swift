@@ -30,41 +30,198 @@ struct Destination: Codable, Hashable {
     }
 }
 
+/// A folder or note plus the keys it can be found by.
+struct IndexEntry {
+    let destination: Destination
+    let name: String        // lowercased
+    let path: String        // lowercased
+    let pinyin: String      // 置身事内 → zhishenshinei
+    let initials: String    // 置身事内 → zssn
+    let aliases: [String]   // frontmatter aliases, lowercased
+}
+
+/// Whole-vault search in the spirit of Obsidian's quick switcher: fuzzy names, pinyin, aliases;
+/// note contents come from Spotlight (see `ContentSearch`).
 enum VaultIndex {
-    /// Folders and Markdown notes in the vault (hidden folders such as .obsidian/.trash skipped).
-    static func scan(_ vault: URL, limit: Int = 30_000) -> [Destination] {
+    static func entry(_ d: Destination, aliases: [String] = []) -> IndexEntry {
+        let name = d.kind == .folder && d.path.isEmpty ? "" : d.name
+        let py = pinyin(name)
+        return IndexEntry(destination: d, name: name.lowercased(), path: d.path.lowercased(),
+                          pinyin: py.full, initials: py.initials, aliases: aliases.map { $0.lowercased() })
+    }
+
+    /// Folders and Markdown notes (hidden folders and Obsidian's 「排除的文件」 skipped).
+    static func scan(_ vault: URL, limit: Int = 30_000) -> [IndexEntry] {
         let fm = FileManager.default
         guard let en = fm.enumerator(at: vault, includingPropertiesForKeys: [.isDirectoryKey],
                                      options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
         let root = vault.standardizedFileURL.path
-        var out = [Destination(kind: .folder, path: "")]
+        let ignored = ignoreFilters(vault)
+        var out = [entry(Destination(kind: .folder, path: ""))]
         for case let url as URL in en {
             if out.count >= limit { break }
             let full = url.standardizedFileURL.path
             guard full.count > root.count + 1 else { continue }
             let rel = String(full.dropFirst(root.count + 1))
-            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                out.append(Destination(kind: .folder, path: rel))
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            if ignored.contains(where: { $0(rel) }) { if isDir { en.skipDescendants() }; continue }
+            if isDir {
+                out.append(entry(Destination(kind: .folder, path: rel)))
             } else if url.pathExtension.lowercased() == "md" {
-                out.append(Destination(kind: .note, path: rel))
+                out.append(entry(Destination(kind: .note, path: rel), aliases: aliases(of: url)))
             }
         }
         return out
     }
 
-    /// Every query word must appear in the path; file-name prefix matches rank first, then shorter paths.
-    static func search(_ items: [Destination], _ query: String, limit: Int = 50) -> [Destination] {
-        let words = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !words.isEmpty else { return [] }
-        let scored: [(Destination, Int)] = items.compactMap { d in
-            let path = d.path.lowercased()
-            guard words.allSatisfy({ path.contains($0) }) else { return nil }
-            let name = d.name.lowercased()
-            var score = d.path.count
-            if name.hasPrefix(words[0]) { score -= 1000 } else if name.contains(words[0]) { score -= 500 }
-            return (d, score)
+    /// Obsidian's Settings → Files & links → Excluded files: path prefixes or /regex/.
+    static func ignoreFilters(_ vault: URL) -> [(String) -> Bool] {
+        guard let data = try? Data(contentsOf: vault.appendingPathComponent(".obsidian/app.json")),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = obj["userIgnoreFilters"] as? [String] else { return [] }
+        return list.compactMap { f in
+            if f.count > 2, f.hasPrefix("/"), f.hasSuffix("/"), let re = try? NSRegularExpression(pattern: String(f.dropFirst().dropLast())) {
+                return { re.firstMatch(in: $0, range: NSRange(location: 0, length: ($0 as NSString).length)) != nil }
+            }
+            let prefix = f.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return prefix.isEmpty ? nil : { $0 == prefix || $0.hasPrefix(prefix + "/") }
         }
-        return scored.sorted { $0.1 < $1.1 }.prefix(limit).map(\.0)
+    }
+
+    /// `aliases:` / `alias:` from YAML frontmatter (inline list, block list or single value).
+    static func aliases(of url: URL) -> [String] {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? h.close() }
+        guard let data = try? h.read(upToCount: 4096), let text = String(data: data, encoding: .utf8), text.hasPrefix("---") else { return [] }
+        let lines = text.components(separatedBy: "\n").dropFirst()
+        var out: [String] = [], inList = false
+        func clean(_ s: String) -> String { s.trimmingCharacters(in: CharacterSet(charactersIn: " \"'[]")) }
+        for line in lines {
+            if line.hasPrefix("---") { break }
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if inList, t.hasPrefix("- ") { out.append(clean(String(t.dropFirst(2)))); continue }
+            inList = false
+            guard let colon = t.firstIndex(of: ":"), ["aliases", "alias"].contains(t[..<colon].lowercased()) else { continue }
+            let value = t[t.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            if value.isEmpty { inList = true } else { out += value.split(separator: ",").map { clean(String($0)) } }
+        }
+        return out.filter { !$0.isEmpty }
+    }
+
+    static func pinyin(_ s: String) -> (full: String, initials: String) {
+        guard s.unicodeScalars.contains(where: { (0x4E00...0x9FFF).contains($0.value) }) else { return ("", "") }
+        let m = NSMutableString(string: s)
+        CFStringTransform(m, nil, kCFStringTransformMandarinLatin, false)
+        CFStringTransform(m, nil, kCFStringTransformStripDiacritics, false)
+        let parts = (m as String).lowercased().split { !$0.isLetter && !$0.isNumber }
+        return (parts.joined(), parts.compactMap { $0.first }.map(String.init).joined())
+    }
+
+    /// fzf-style subsequence match: consecutive runs and word starts score high, gaps cost a little.
+    static func fuzzy(_ query: String, _ target: String) -> Int? {
+        let q = Array(query), t = Array(target)
+        guard !q.isEmpty, q.count <= t.count else { return nil }
+        var qi = 0, score = 0, streak = 0, last = -1, first = -1
+        for (i, c) in t.enumerated() where qi < q.count && c == q[qi] {
+            if first < 0 { first = i }
+            var s = 10
+            if i == last + 1 { streak += 1; s += 6 * streak } else { streak = 0; if last >= 0 { s -= min(i - last - 1, 5) } }
+            if i == 0 || " /-_.（(".contains(t[i - 1]) { s += 12 }
+            score += s; last = i; qi += 1
+        }
+        return qi == q.count ? score - min(first, 10) : nil
+    }
+
+    private static func score(_ word: String, _ e: IndexEntry) -> Int? {
+        var best: Int?
+        func take(_ v: Int?) { if let v { best = max(best ?? v, v) } }
+        if e.name.hasPrefix(word) { take(1000) } else if e.name.contains(word) { take(600) }
+        take(fuzzy(word, e.name).map { $0 * 3 })
+        for a in e.aliases {
+            if a.hasPrefix(word) { take(900) }
+            take(fuzzy(word, a).map { $0 * 3 })
+        }
+        if word.allSatisfy(\.isASCII), !e.pinyin.isEmpty {
+            if e.initials.hasPrefix(word) { take(800) }
+            if word.count >= 2, e.pinyin.hasPrefix(word) { take(850) } else if word.count >= 3, e.pinyin.contains(word) { take(450) }
+            take(fuzzy(word, e.initials).map { $0 * 3 })
+            take(fuzzy(word, e.pinyin).map { $0 * 2 })
+        }
+        take(fuzzy(word, e.path))
+        return best
+    }
+
+    /// Pinyin input methods show composing text with syllable separators (yi'ji); drop them.
+    static func normalize(_ query: String) -> String {
+        query.lowercased()
+            .replacingOccurrences(of: "['’‘ˈ`]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "[\\s\u{2000}-\u{200B}\u{3000}]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Every query word must match (name, alias, pinyin or path); best total first, then shorter paths.
+    /// Space-separated pinyin syllables ("yi ji") also count as one word ("yiji").
+    static func search(_ items: [IndexEntry], _ query: String, limit: Int = 50) -> [Destination] {
+        let words = normalize(query).split(separator: " ").map(String.init)
+        guard !words.isEmpty else { return [] }
+        let joined = words.count > 1 && words.allSatisfy { $0.allSatisfy { $0.isASCII && $0.isLetter } } ? words.joined() : nil
+        let scored: [(Destination, Int)] = items.compactMap { e in
+            guard !e.path.isEmpty else { return nil }
+            var total: Int? = 0
+            for w in words { guard let s = score(w, e) else { total = nil; break }; total! += s }
+            if let joined, let s = score(joined, e) { total = max(total ?? s, s) }
+            return total.map { (e.destination, $0) }
+        }
+        return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.path.count < $1.0.path.count }.prefix(limit).map(\.0)
+    }
+}
+
+/// Full-text search over note contents through Spotlight: no index of our own to build or keep fresh.
+final class ContentSearch {
+    private var query: NSMetadataQuery?
+    private var observer: NSObjectProtocol?
+
+    func run(_ text: String, in vault: URL, completion: @escaping ([(Destination, String)]) -> Void) {
+        cancel()
+        let q = NSMetadataQuery()
+        q.predicate = NSPredicate(format: "kMDItemTextContent CONTAINS[cd] %@ AND kMDItemFSName ENDSWITH[c] '.md'", text)
+        q.searchScopes = [vault]
+        let root = vault.standardizedFileURL.path
+        observer = NotificationCenter.default.addObserver(forName: .NSMetadataQueryDidFinishGathering, object: q, queue: .main) { [weak self] _ in
+            q.stop()
+            let paths = (0..<min(q.resultCount, 40)).compactMap { (q.result(at: $0) as? NSMetadataItem)?.value(forAttribute: NSMetadataItemPathKey) as? String }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let hits: [(Destination, String)] = paths.compactMap { p in
+                    let full = URL(fileURLWithPath: p).standardizedFileURL.path
+                    guard full.hasPrefix(root + "/") else { return nil }
+                    let rel = String(full.dropFirst(root.count + 1))
+                    guard !rel.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { return nil }
+                    return (Destination(kind: .note, path: rel), Self.snippet(in: URL(fileURLWithPath: p), for: text) ?? "")
+                }
+                DispatchQueue.main.async { completion(Array(hits.prefix(15))) }
+            }
+            self?.cancel()
+        }
+        query = q
+        q.start()
+    }
+
+    func cancel() {
+        query?.stop(); query = nil
+        if let o = observer { NotificationCenter.default.removeObserver(o); observer = nil }
+    }
+
+    /// The line around the first match, trimmed to fit a row.
+    static func snippet(in url: URL, for text: String) -> String? {
+        guard let s = try? String(contentsOf: url, encoding: .utf8),
+              let r = s.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) else { return nil }
+        let line = s[s.lineRange(for: r)].trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: #"^([#>\-*+]|\d+\.)+\s*"#, with: "", options: .regularExpression)
+        guard let lr = line.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) else { return line }
+        let before = line[..<lr.lowerBound], after = line[lr.upperBound...]
+        let head = before.count > 18 ? "…" + before.suffix(18) : String(before)
+        let tail = after.count > 40 ? after.prefix(40) + "…" : String(after)
+        return head + line[lr] + tail
     }
 }
 

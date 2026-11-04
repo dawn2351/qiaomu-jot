@@ -5,6 +5,7 @@
 | Component | Used for | License | Text |
 |---|---|---|---|
 | [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) by Sindre Sorhus | Global shortcut recording | MIT | [`licenses/KeyboardShortcuts-MIT.txt`](licenses/KeyboardShortcuts-MIT.txt) |
+| [Sparkle](https://sparkle-project.org) | Auto-update (`Contents/Frameworks/Sparkle.framework`) | MIT | [`licenses/Sparkle-MIT.txt`](licenses/Sparkle-MIT.txt) |
 | [Geist & Geist Mono](https://github.com/vercel/geist-font) by Vercel and basement.studio | UI fonts (`Resources/Fonts`) | SIL Open Font License 1.1 | [`licenses/Geist-OFL.txt`](licenses/Geist-OFL.txt) |
 | [Lucide](https://lucide.dev) | App icon artwork, menu bar glyph, fallback app glyphs (`Resources/Icons/lucide`, `Resources/AppIcon.icon`) | ISC | [`licenses/Lucide-ISC.txt`](licenses/Lucide-ISC.txt) |
 | [Simple Icons](https://simpleicons.org) | Monochrome brand marks that identify the source app (`Resources/Icons/brands`) | CC0 1.0 | [`licenses/simple-icons-CC0.md`](licenses/simple-icons-CC0.md) |

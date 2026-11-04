@@ -2,6 +2,30 @@ import AppKit
 import ApplicationServices
 import UniformTypeIdentifiers
 
+/// File links on the pasteboard that are safe to use. Apps like WeChat put a link into their own
+/// sandbox container (~/Library/Containers/…) next to the image data; reading that link triggers macOS's
+/// "App Data" privacy check with nothing the user can grant. Prefer the data whenever it's there.
+enum PasteboardFiles {
+    static func isInOtherAppsContainer(_ url: URL) -> Bool {
+        let p = url.standardizedFileURL.path
+        return p.contains("/Library/Containers/") || p.contains("/Library/Group Containers/")
+    }
+
+    static var mediaDataTypes: [NSPasteboard.PasteboardType] {
+        CaptureModel.mediaTypes.map { NSPasteboard.PasteboardType($0.type.identifier) } + [.tiff]
+    }
+
+    /// Usable file URLs, or nil when the pasteboard's own image/video data should be used instead.
+    static func usable(_ pb: NSPasteboard) -> [URL]? {
+        guard let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              !urls.isEmpty else { return nil }
+        if urls.contains(where: isInOtherAppsContainer), pb.availableType(from: mediaDataTypes) != nil { return nil }
+        // Files only: a copied folder would pull a whole directory into the vault.
+        let files = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true }
+        return files.isEmpty ? nil : files
+    }
+}
+
 /// Raw selection from the frontmost app.
 struct Grabbed {
     var text = ""
@@ -67,10 +91,8 @@ enum SelectionGrabber {
         var g = Grabbed()
         let types = pb.types ?? []
         g.concealed = types.contains(NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
-        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           !urls.isEmpty {
-            // Files only: a copied folder would pull a whole directory into the vault.
-            g.files = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true }
+        if let files = PasteboardFiles.usable(pb) {
+            g.files = files
             return g
         }
         g.text = pb.string(forType: .string) ?? ""

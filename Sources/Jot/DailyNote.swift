@@ -224,7 +224,11 @@ struct DailyNoteWriter {
         var embeds: [String] = [], copied: [URL] = []
         for src in attachments {
             let dest = uniqueDestination(adir, name: src.lastPathComponent)
-            try fm.copyItem(at: src, to: dest)
+            do { try fm.copyItem(at: src, to: dest) } catch {
+                // Protected by macOS (e.g. inside another app's container): keep the rest of the capture.
+                History.skipped.append(src.lastPathComponent)
+                continue
+            }
             copied.append(dest)
             var embed: String
             if obsidian {
@@ -316,6 +320,9 @@ enum History {
             return "附件"
         }
     }
+    /// Attachments the last save couldn't read (reported in the toast, then cleared).
+    static var skipped: [String] = []
+
     static var last: Entry? {
         didSet { if let e = last { RecentCaptures.record(e) } }
     }

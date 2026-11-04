@@ -40,9 +40,8 @@ final class MediaDropHandler {
     func perform(_ pb: NSPasteboard) -> Bool {
         guard let model else { return false }
         // 1. Real files (Finder, most apps).
-        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           !urls.isEmpty {
-            model.add(urls: urls)
+        if let files = PasteboardFiles.usable(pb) {
+            model.add(urls: files)
             return true
         }
         // 2. File promises: keep the original file (name, format, GIF animation).
