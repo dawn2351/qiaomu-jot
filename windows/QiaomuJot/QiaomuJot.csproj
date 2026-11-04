@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <AssemblyName>QiaomuJot</AssemblyName>
+    <RootNamespace>QiaomuJot</RootNamespace>
+    <StartupObject>QiaomuJot.App</StartupObject>
+    <Version>1.0.0</Version>
+    <Authors>Qiaomu Jot Team</Authors>
+    <Company>Qiaomu Jot</Company>
+    <Product>乔木闪记 · Jot</Product>
+    <Description>一个快捷键，把灵感、选中文字和截图收进 Obsidian 或 Markdown 文件夹的超棒工具</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\icon.png" />
+    <None Include="Resources\app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Resources\Sounds\*.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

@@ -140,13 +140,11 @@ open build/Jot.app
 ## 项目结构
 
 ```text
-Sources/Jot/          Swift 源码（SwiftUI + AppKit）
-  main.swift            菜单栏、快捷键、窗口、自测与截图模式
-  CaptureView.swift     输入框界面与数据模型
-  Markdown.swift        Markdown 实时渲染与编辑命令
-  SourceContext.swift   识别来源 App、网址、PDF 页码
-  CaptureFormatter.swift 网页 HTML 转 Markdown、PDF 与电子书文字整理
-  DailyNote.swift       写入日记、附件、撤销
+Sources/Jot/          macOS Swift 源码（SwiftUI + AppKit）
+windows/QiaomuJot/    Windows 原生源码（.NET 9 + WPF + Windows.Media.Ocr）
+  App.xaml.cs           单例检测、托盘常驻、启动与自检入口
+  Services/             全局键盘钩子、剪贴板抓取与恢复、离线OCR、日记读写与撤销
+  UI/                   随手记浮动窗口、Toast提示、设置窗口与托盘菜单
 Resources/            图标（Icon Composer）、字体、音效、品牌图标
 build.sh · release.sh  构建；签名、DMG、公证
 ```
