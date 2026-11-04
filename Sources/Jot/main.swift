@@ -400,16 +400,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     if prefs.openAfterSave { CaptureModel.open(note: note, vault: vault) }
                     SaveSound.play(prefs.saveSound)
                     NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                    // 打开: Obsidian vault → Obsidian; plain folder → the default Markdown app. Hidden when it already opened.
+                    let open: [Toast.Action] = prefs.openAfterSave ? [] : [
+                        .init(title: "打开") { CaptureModel.open(note: note, vault: vault) },
+                    ]
                     if !skipped.isEmpty {
-                        Toast.show("已收录，但有 \(skipped.count) 个文件读不到", detail: Self.protectedHint, style: .warning, actions: [
-                            .init(title: "撤销") { self?.undoLast() },
-                        ], duration: 6)
+                        Toast.show("已收录，但有 \(skipped.count) 个文件读不到", detail: Self.protectedHint, style: .warning,
+                                   actions: [.init(title: "撤销") { self?.undoLast() }] + open, duration: 6)
                         return
                     }
                     Toast.show(title, detail: detail, source: toastSource, actions: [
                         .init(title: "撤销") { self?.undoLast() },
                         .init(title: "补充想法") { History.last.map { self?.show(amend: $0) } },
-                    ], duration: 3.2)
+                    ] + open, duration: 3.6)
                 } catch {
                     Toast.show("保存失败", detail: error.localizedDescription, style: .warning)
                 }
@@ -603,7 +606,7 @@ func snapshot(_ path: String, text: String, dark: Bool) {
            : NSHostingView(rootView: AnyView(GeneralSettings())))
         : args.contains("--toast")
         ? NSHostingView(rootView: ToastView(title: "已收录到今日日记", detail: "置身事内 - 读书笔记", source: Prefs.sampleSource, style: .success,
-                                            actions: [.init(title: "撤销") {}, .init(title: "补充想法") {}], onHover: { _ in }))
+                                            actions: [.init(title: "撤销") {}, .init(title: "补充想法") {}, .init(title: "打开") {}], onHover: { _ in }))
         : NSHostingView(rootView: CaptureView(model: m))
     host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
     host.frame = NSRect(origin: .zero, size: host.fittingSize)
