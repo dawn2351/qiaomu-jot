@@ -25,6 +25,14 @@ final class Prefs: ObservableObject {
     @AppStorage("saveSound") var saveSound: String = "kenney:glass_004"
     @AppStorage("showFormatBar") var showFormatBar: Bool = false
     @AppStorage("didOnboard") var didOnboard: Bool = false
+    /// Set by the first successful save; ticks the last onboarding step.
+    @AppStorage("didFirstCapture") var didFirstCapture: Bool = false
+    @AppStorage("onboardingDismissed") var onboardingDismissed: Bool = false
+
+    var vaultExists: Bool {
+        var isDir: ObjCBool = false
+        return !vaultPath.isEmpty && FileManager.default.fileExists(atPath: vaultPath, isDirectory: &isDir) && isDir.boolValue
+    }
     /// The user's choice; re-applied at launch so it survives moving or renaming the app.
     @AppStorage("launchAtLogin") var launchAtLogin: Bool = true     // on by default; registered at first launch
     @AppStorage("rememberDestination") var rememberDestination: Bool = false

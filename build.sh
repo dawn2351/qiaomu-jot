@@ -23,6 +23,13 @@ cp -R Resources/About "$APP/Contents/Resources/About"      # WeChat / reward QR 
 cp THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
 for b in "$BIN"/*.bundle; do if [ -e "$b" ]; then cp -R "$b" "$APP/Contents/Resources/"; fi; done
 
+# Sparkle (auto-update): embed the framework and let the binary find it.
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+if ! otool -l "$APP/Contents/MacOS/Jot" | grep -q "@executable_path/../Frameworks"; then
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Jot"
+fi
+
 # Icon Composer icon → Assets.car (macOS 26+) and AppIcon.icns (older systems).
 xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
   --minimum-deployment-target 13.0 --app-icon AppIcon --target-device mac \
@@ -49,6 +56,9 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSHumanReadableCopyright</key><string>© 2026 乔木</string>
+<key>SUFeedURL</key><string>https://github.com/joeseesun/qiaomu-jot/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>ftyDAv8Qvb8tv4nf5jnMWtCgIi9yVI2IM6p+qhrKz90=</string>
+<key>SUEnableAutomaticChecks</key><true/>
 <key>NSAppleEventsUsageDescription</key><string>用于读取浏览器当前网页的标题和链接、邮件的主题和链接，作为收录内容的来源。</string>
 </dict></plist>
 PL
@@ -71,6 +81,14 @@ if [ -z "$IDENTITY" ]; then
   IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 "Apple Development" | sed -E 's/.*"(.*)"/\1/' || true)
 fi
 TS="--timestamp=none"; if [ "${RELEASE:-0}" = "1" ]; then TS="--timestamp"; fi
+# Sparkle's helpers are signed inside-out before the app (its documented Developer ID order).
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for item in "$SPK/XPCServices/Installer.xpc" "$SPK/XPCServices/Downloader.xpc" "$SPK/Autoupdate" "$SPK/Updater.app" \
+            "$APP/Contents/Frameworks/Sparkle.framework"; do
+  if [ -e "$item" ]; then
+    codesign --force --options runtime $TS --preserve-metadata=entitlements --sign "${IDENTITY:--}" "$item"
+  fi
+done
 codesign --force --options runtime $TS --entitlements Resources/Jot.entitlements \
   --sign "${IDENTITY:--}" "$APP"
 echo "Built: $APP ($VERSION, signed by ${IDENTITY:-ad-hoc})"

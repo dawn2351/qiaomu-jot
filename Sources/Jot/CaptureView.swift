@@ -42,14 +42,26 @@ final class CaptureModel: ObservableObject {
     // Save destination
     @Published var destination: Destination = Prefs.shared.rememberDestination ? Prefs.shared.lastDestination : .daily
     @Published var noteTitle = ""
+    /// The scene this panel was opened for (shown in the bar; its todo setting applies).
+    @Published var recipe: Recipe?
+
+    func apply(_ r: Recipe?) {
+        guard let r, amend == nil else { return }
+        recipe = r
+        destination = r.destination
+    }
     @Published var picking = false
-    @Published var pickerQuery = "" { didSet { pickerSelection = 0 } }
+    @Published var pickerQuery = "" { didSet { pickerSelection = 0; scheduleContentSearch() } }
+    /// Notes whose contents match the query (Spotlight), with the matching line.
+    @Published var contentHits: [(Destination, String)] = []
+    private let contentSearch = ContentSearch()
+    private var contentWork: DispatchWorkItem?
     @Published var pickerSelection = 0
     @Published var indexLoaded = false
-    var vaultIndex: [Destination] = []
+    var vaultIndex: [IndexEntry] = []
     /// Design snapshots only.
     var previewRecents: [RecentDestination]?
-    private static var indexCache: [String: [Destination]] = [:]
+    private static var indexCache: [String: [IndexEntry]] = [:]
     @Published var showFormatBar = Prefs.shared.showFormatBar {
         didSet { Prefs.shared.showFormatBar = showFormatBar }
     }
@@ -58,6 +70,13 @@ final class CaptureModel: ObservableObject {
     init() {
         refreshCount()
         dropHandler = MediaDropHandler(model: self)
+        checkVault()
+    }
+
+    /// A moved, renamed or deleted save folder is reported up front instead of failing on save.
+    func checkVault() {
+        let p = Prefs.shared
+        error = p.vaultPath.isEmpty ? "还没选择保存位置" : (p.vaultExists ? nil : "保存位置不存在了")
     }
 
     private func refreshCount() { todayCount = Prefs.shared.dailyCount() }
@@ -68,7 +87,7 @@ final class CaptureModel: ObservableObject {
         Prefs.shared.vaultPath = path
         if !FolderMode.isObsidianVault(URL(fileURLWithPath: path)) { Prefs.shared.rememberFolder(path) }
         vaultPath = path
-        error = nil
+        checkVault()
         destination = .daily
         vaultIndex = []
         indexLoaded = false
@@ -78,40 +97,69 @@ final class CaptureModel: ObservableObject {
     // MARK: Destination picker
 
     struct PickerRow: Identifiable {
-        enum Kind { case header(String), item(Int, Destination, Date?) }
+        enum Kind { case header(String), item(Int, PickerItem) }
         let id: String
         let kind: Kind
     }
 
-    /// Flat, keyboard-navigable list: daily note, recents and top-level folders; or search results.
-    var pickerItems: [(section: String, items: [(Destination, Date?)])] {
+    struct PickerItem {
+        let destination: Destination
+        var date: Date? = nil
+        var snippet: String? = nil
+    }
+
+    /// Flat, keyboard-navigable list: daily note, recents and top-level folders; or search results
+    /// (fuzzy names / pinyin / aliases across the whole vault, then notes whose contents match).
+    var pickerItems: [(section: String, items: [PickerItem])] {
         let q = pickerQuery.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
             let recents = previewRecents ?? Prefs.shared.vaultURL.map { Prefs.shared.recentPlaces(vault: $0) } ?? []
             let used = Set(recents.map(\.destination))
-            let folders = vaultIndex.filter { $0.kind == .folder && !$0.path.contains("/") && !used.contains($0) }
-            return [("默认", [(.daily, nil)]),
-                    ("最近", recents.map { ($0.destination, $0.date) }),
-                    ("文件夹", folders.prefix(30).map { ($0, nil) })].filter { !$0.items.isEmpty }
+            let folders = vaultIndex.map(\.destination).filter { $0.kind == .folder && !$0.path.isEmpty && !$0.path.contains("/") && !used.contains($0) }
+            let scenes = Prefs.shared.recipes.map { PickerItem(destination: $0.destination, snippet: "场景 · \($0.displayName)") }
+            return [("默认", [PickerItem(destination: .daily)]),
+                    ("场景", scenes),
+                    ("最近", recents.map { PickerItem(destination: $0.destination, date: $0.date) }),
+                    ("文件夹", [PickerItem(destination: Destination(kind: .folder, path: ""))]
+                        + folders.prefix(30).map { PickerItem(destination: $0) })].filter { !$0.items.isEmpty }
         }
         var results = VaultIndex.search(vaultIndex, q)
-        if "今日日记 daily today".contains(q.lowercased()) { results.insert(.daily, at: 0) }
-        return results.isEmpty ? [] : [("结果", results.map { ($0, nil) })]
+        if "今日日记 daily today jrrj".contains(q.lowercased()) { results.insert(.daily, at: 0) }
+        let named = Set(results)
+        let content = contentHits.filter { !named.contains($0.0) }.map { PickerItem(destination: $0.0, snippet: $0.1) }
+        return [("笔记与文件夹", results.map { PickerItem(destination: $0) }), ("内容", content)].filter { !$0.items.isEmpty }
+    }
+
+    private func scheduleContentSearch() {
+        contentWork?.cancel()
+        contentSearch.cancel()
+        let q = VaultIndex.normalize(pickerQuery)
+        let long = q.count >= (q.allSatisfy(\.isASCII) ? 3 : 2)
+        guard picking, long, let vault = Prefs.shared.vaultURL else { contentHits = []; return }
+        let work = DispatchWorkItem { [weak self] in
+            self?.contentSearch.run(q, in: vault) { hits in
+                guard let self, VaultIndex.normalize(self.pickerQuery) == q else { return }
+                self.contentHits = hits
+            }
+        }
+        contentWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     var pickerRows: [PickerRow] {
         var rows: [PickerRow] = [], i = 0
         for (section, items) in pickerItems {
             rows.append(PickerRow(id: "h-" + section, kind: .header(section)))
-            for (d, date) in items {
-                rows.append(PickerRow(id: "\(section)-\(d.kind.rawValue)-\(d.path)", kind: .item(i, d, date)))
+            for item in items {
+                let d = item.destination
+                rows.append(PickerRow(id: "\(section)-\(d.kind.rawValue)-\(d.path)", kind: .item(i, item)))
                 i += 1
             }
         }
         return rows
     }
 
-    private var pickerFlat: [Destination] { pickerItems.flatMap { $0.items.map(\.0) } }
+    private var pickerFlat: [Destination] { pickerItems.flatMap { $0.items.map(\.destination) } }
 
     func openPicker() {
         guard amend == nil else { return }
@@ -133,6 +181,7 @@ final class CaptureModel: ObservableObject {
 
     func closePicker() {
         picking = false
+        contentSearch.cancel()
         focusEditor?()
     }
 
@@ -150,6 +199,7 @@ final class CaptureModel: ObservableObject {
 
     func choose(_ d: Destination) {
         destination = d
+        if recipe?.destination != d { recipe = Prefs.shared.recipes.first { $0.destination == d } }
         picking = false
         error = nil
         DispatchQueue.main.async { self.focusEditor?() }
@@ -158,7 +208,8 @@ final class CaptureModel: ObservableObject {
     var autoTitle: String { NoteNaming.autoTitle(from: text) }
 
     var destinationLabel: String {
-        destination.kind == .daily ? (Self.todayNote?.deletingPathExtension().lastPathComponent ?? "今日日记") : destination.name
+        if let recipe, recipe.destination == destination { return recipe.displayName }
+        return destination.kind == .daily ? (Self.todayNote?.deletingPathExtension().lastPathComponent ?? "今日日记") : destination.name
     }
 
     func appendText(_ s: String) {
@@ -238,10 +289,7 @@ final class CaptureModel: ObservableObject {
     /// picture of itself, e.g. from Word or Keynote) is left for the text view.
     func pasteIfMedia() -> Bool {
         let pb = NSPasteboard.general
-        if let urls = pb.readObjects(forClasses: [NSURL.self],
-                                     options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            add(urls: urls); return true
-        }
+        if let files = PasteboardFiles.usable(pb) { add(urls: files); return true }
         let types = Self.mediaTypes.map { NSPasteboard.PasteboardType($0.type.identifier) } + [.tiff]
         guard let type = pb.availableType(from: types) else { return false }
         let s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -320,6 +368,7 @@ final class CaptureModel: ObservableObject {
         let prefs = Prefs.shared
         guard let vault = prefs.vaultURL else { return }
         let writer = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder)
+        History.skipped = []
         do {
             let note: URL
             if let amend {
@@ -329,11 +378,11 @@ final class CaptureModel: ObservableObject {
                 switch destination.kind {
                 case .daily:
                     note = try writer.append(content: bodyText, attachments: attachments, ocr: ocr, source: savedSource,
-                                             asTask: isTask, heading: prefs.insertHeading)
+                                             asTask: isTask || recipe?.asTask == true, heading: prefs.insertHeading)
                     _ = prefs.dailyCount(1)
                 case .note:
                     note = try writer.append(content: bodyText, attachments: attachments, ocr: ocr, source: savedSource,
-                                             asTask: isTask, to: vault.appendingPathComponent(destination.path))
+                                             asTask: isTask || recipe?.asTask == true, to: vault.appendingPathComponent(destination.path))
                 case .folder:
                     let title = noteTitle.trimmingCharacters(in: .whitespaces).isEmpty ? autoTitle : NoteNaming.sanitize(noteTitle)
                     note = try writer.createNote(folder: destination.path, title: title.isEmpty ? autoTitle : title,
@@ -347,7 +396,11 @@ final class CaptureModel: ObservableObject {
                 ? (destination.kind == .folder ? note.deletingPathExtension().lastPathComponent : destination.name) : nil
             rememberTags()
             discardTemp()
+            prefs.didFirstCapture = true
             if prefs.openAfterSave { Self.open(note: note, vault: vault) }
+            if !History.skipped.isEmpty {
+                Toast.show("已保存，但有 \(History.skipped.count) 个文件读不到", detail: AppDelegate.protectedHint, style: .warning, duration: 6)
+            }
             SaveSound.play(prefs.saveSound)
             NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
             withAnimation(.easeOut(duration: 0.18)) { saved = true }
@@ -628,6 +681,10 @@ struct CaptureView: View {
             if let e = model.error {
                 Circle().fill(Color.red).frame(width: 6, height: 6)
                 Text(e).font(Theme.sans(12)).foregroundStyle(Color.red).lineLimit(1)
+                if !Prefs.shared.vaultExists {
+                    Button("重新选择…") { model.showVaultMenu() }
+                        .buttonStyle(.plain).font(Theme.sans(12, .medium)).foregroundStyle(Theme.text)
+                }
             } else if let amend = model.amend {
                 Image(systemName: "arrow.turn.down.right").font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.muted)

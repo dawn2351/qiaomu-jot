@@ -18,7 +18,7 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
 
 </div>
 
-**已验证：** `Jot --selftest` 87 项检查全部通过（编辑、记录格式、写入、剪贴板、本机 OCR）；安装包经 Apple 公证（`spctl`：Notarized Developer ID）；Apple 芯片与 Intel 通用二进制。
+**已验证：** `Jot --selftest` 106 项检查全部通过（编辑、记录格式、写入、剪贴板、搜索、场景、本机 OCR）；安装包经 Apple 公证（`spctl`：Notarized Developer ID）；Apple 芯片与 Intel 通用二进制。
 
 ## 这是什么
 
@@ -31,7 +31,7 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
 | **⌘⇧J** 随手记 | 在任何地方弹出一个输入框，写字、粘贴截图、拖入图片视频，⌘↩ 存进今日日记 |
 | **⌘⇧K** 一键收录 | 不弹窗。选中的文字、网页、PDF、代码、Finder 里的文件，直接存进去；没选中就存剪贴板或刚截的屏 |
 
-快捷键可以在设置里改成任何组合。
+快捷键可以在设置里改成任何组合。还可以加最多 6 个**场景**：比如 ⌃⌥1「灵感」、⌃⌥2「读书摘录」，按一下就记到对应的笔记或文件夹。
 
 ## 核心能力
 
@@ -42,9 +42,12 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
 | 剪贴板与截图 | 没选中内容时，收录剪贴板里的文字、图片、视频、文件，或刚截的屏；同一份只收一次 |
 | 截图文字识别 | 本机识别中英文，写进图片下方默认折叠的块，日后能搜到 |
 | Markdown 实时渲染 | 编辑时就看到粗体、标题、列表、代码；⌘B ⌘I ⌘K 等快捷键和格式栏 |
-| 存到哪都行 | 默认今日日记；⌘P 可选任意笔记追加，或在文件夹里新建笔记；记住最近用过的位置 |
+| 场景 | 给常用去处配快捷键：选预设、按快捷键、选笔记或文件夹，三步就能用 |
+| 全库搜索 | ⌘P 搜任意笔记和文件夹：模糊匹配、拼音和首字母（`zssn` → 置身事内）、别名、笔记正文 |
+| 存到哪都行 | 默认今日日记，也可追加到任意笔记或在文件夹里新建笔记；记住最近用过的位置 |
 | 不依赖 Obsidian | 选普通文件夹就用标准 Markdown 链接，Typora、VS Code、iA Writer 都能打开 |
 | 随时撤销 | 提示条和菜单栏都能撤销上一条，或给它补一句想法 |
+| 自动更新 | 有新版时在菜单栏旁轻提示，一键更新（Sparkle，签名校验） |
 | 隐私 | 全部在本机完成；密码框和 1Password 等密码管理器的内容不收录 |
 
 ## 写进笔记的样子
@@ -67,6 +70,8 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
    - 选择保存位置：已装 Obsidian 会自动选中最近的仓库；没装就用 `~/文稿/乔木闪记`。
    - 点「开启辅助功能…」授权。收录其他 App 里选中的内容需要这个权限。
 3. 在任何地方按 **⌘⇧J** 写一句话，按 **⌘↩** 保存。
+
+设置「通用」页顶部的「开始使用」清单会带你走完这三步。之后有新版本会自动提示。
 
 <details>
 <summary>从源码构建</summary>
@@ -100,7 +105,8 @@ open build/Jot.app
 |---|---|
 | 打开输入框 / 收录选中内容 | ⌘⇧J / ⌘⇧K（可自定义） |
 | 保存 / 关闭（保留草稿） | ⌘↩ / Esc |
-| 选择保存位置 | ⌘P |
+| 选择保存位置（搜索全库） | ⌘P |
+| 场景 | 自定义，默认 ⌃⌥1…6 |
 | 格式栏 / 添加附件 | ⌘/ / ⌘O |
 | 粗体 · 斜体 · 链接 · 行内代码 | ⌘B · ⌘I · ⌘K · ⌘E |
 | 标题 · 待办 · 列表 · 引用 | ⌘1/2/3 · ⌘L · ⌘⇧8 · ⌘' |
@@ -147,7 +153,7 @@ build.sh · release.sh  构建；签名、DMG、公证
 
 ## 致谢
 
-[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) · [Geist](https://github.com/vercel/geist-font) · [Lucide](https://lucide.dev) · [Simple Icons](https://simpleicons.org) · [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds)。许可详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) · [Sparkle](https://sparkle-project.org) · [Geist](https://github.com/vercel/geist-font) · [Lucide](https://lucide.dev) · [Simple Icons](https://simpleicons.org) · [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds)。许可详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 欢迎提 [issue](https://github.com/joeseesun/qiaomu-jot/issues) 和 PR，见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
@@ -175,7 +181,10 @@ MIT © 2026 向阳乔木
 - **⌘⇧K — Capture selection.** Saves whatever is selected in the front app, without a window: web text (converted to Markdown, with page title and link), PDF text (line breaks repaired, with page number), Apple Books and Kindle quotes (citation parsed), code (fenced, language detected), or Finder files. With nothing selected it saves the clipboard (text, images, video, files) or the screenshot you just took. Each one is saved only once.
 - **Verbatim by default.** No bullets or quote markers are added to your content. Time and source go on a separate quote line, and both can be turned off. Presets: plain, time-first, list, quote, callout, or your own template.
 - **On-device OCR.** Text in screenshots is written to a folded callout under the image, so you can search for it later.
-- **Any destination.** Today's daily note by default; press ⌘P to append to any note or create a new note in any folder, with recent places listed first.
+- **Scenes.** Up to six named shortcuts (e.g. ⌃⌥1 Ideas, ⌃⌥2 Reading notes), each aimed at a note or folder. Pick a preset and it works immediately.
+- **Whole-vault search.** ⌘P finds any note or folder: fuzzy matching, pinyin and initials, aliases, and note contents (via Spotlight).
+- **Any destination.** Today's daily note by default; append to any note, or create a new note in any folder, with recent places listed first.
+- **Auto-update.** Sparkle, with signed updates and a quiet reminder instead of a pop-up.
 - **Works without Obsidian.** A plain folder gets `日记/YYYY-MM-DD.md`, an `附件/` attachments folder and standard Markdown image links.
 - **Undo** from the toast or the menu bar, or add a follow-up thought to the entry you just saved.
 
@@ -187,7 +196,7 @@ Download [**Jot.dmg**](https://github.com/joeseesun/qiaomu-jot/releases/latest/d
 2. Grant **Accessibility**, which is needed to read selections in other apps.
 3. Press **⌘⇧J** anywhere.
 
-Build from source with `./build.sh` (macOS 13+, Xcode 16+). `build/Jot.app/Contents/MacOS/Jot --selftest` runs 87 checks.
+Build from source with `./build.sh` (macOS 13+, Xcode 16+). `build/Jot.app/Contents/MacOS/Jot --selftest` runs 106 checks.
 
 ### Privacy & limits
 
