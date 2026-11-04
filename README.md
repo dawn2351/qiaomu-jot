@@ -46,7 +46,7 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
 | 全库搜索 | ⌘P 搜任意笔记和文件夹：模糊匹配、拼音和首字母（`zssn` → 置身事内）、别名、笔记正文 |
 | 存到哪都行 | 默认今日日记，也可追加到任意笔记或在文件夹里新建笔记；记住最近用过的位置 |
 | 不依赖 Obsidian | 选普通文件夹就用标准 Markdown 链接，Typora、VS Code、iA Writer 都能打开 |
-| 随时撤销 | 提示条和菜单栏都能撤销上一条，或给它补一句想法 |
+| 随时撤销 | 提示条和菜单栏都能撤销上一条，或给它补一句想法；提示条上点「打开」直接看这条笔记（Obsidian 仓库用 Obsidian，普通文件夹用默认 Markdown 应用） |
 | 自动更新 | 有新版时在菜单栏旁轻提示，一键更新（Sparkle，签名校验） |
 | 隐私 | 全部在本机完成；密码框和 1Password 等密码管理器的内容不收录 |
 
@@ -184,7 +184,7 @@ MIT © 2026 向阳乔木
 - **Any destination.** Today's daily note by default; append to any note, or create a new note in any folder, with recent places listed first.
 - **Auto-update.** Sparkle, with signed updates and a quiet reminder instead of a pop-up.
 - **Works without Obsidian.** A plain folder gets `日记/YYYY-MM-DD.md`, an `附件/` attachments folder and standard Markdown image links.
-- **Undo** from the toast or the menu bar, or add a follow-up thought to the entry you just saved.
+- **Undo** from the toast or the menu bar, or add a follow-up thought to the entry you just saved. **Open** in the toast shows the note: in Obsidian for a vault, otherwise in your default Markdown app.
 
 ### Install
 
