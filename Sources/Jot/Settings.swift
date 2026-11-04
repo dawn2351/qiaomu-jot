@@ -44,6 +44,8 @@ final class Prefs: ObservableObject {
     @AppStorage("ocrImages") var ocrImages: Bool = true
     /// A pasted bare link becomes [page title](url).
     @AppStorage("linkTitles") var linkTitles: Bool = true
+    /// ⌘⇧K with nothing selected also saves what was just copied; off = skip the clipboard (screenshot and page link still work).
+    @AppStorage("clipboardFallback") var clipboardFallback: Bool = true
     /// Daily notes in a plain (non-Obsidian) folder.
     @AppStorage("plainDailyFolder") var plainDailyFolder: String = "日记"
     @AppStorage("plainDailyFormat") var plainDailyFormat: String = "YYYY-MM-DD"

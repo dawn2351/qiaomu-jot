@@ -331,10 +331,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             var title = recipe.map { "已收录到「\($0.displayName)」" } ?? "已收录到今日日记"
             var toastSource: SourceInfo? = SourceInfo(ctx)
             var detail = ctx.kind == .browser ? ctx.pageTitle : nil
+            let prefs = Prefs.shared
             if g.isEmpty {
                 // Nothing selected: what was just copied or captured, newest first.
+                // 「空选时收录剪贴板」off: skip the clipboard; the newest screenshot and the page link still work.
                 let watcher = ClipboardWatcher.shared
-                let recentClip = watcher.clip(within: 300)
+                let recentClip = prefs.clipboardFallback ? watcher.clip(within: 300) : nil
                 let shot = ScreenshotFinder.latest()
                 func useClip(_ clip: ClipboardWatcher.Clip) {
                     result = CaptureFormatter.compose(clip.grabbed, clip.context)
@@ -356,10 +358,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 } else if ctx.kind == .browser, let link = CaptureFormatter.pageLink(ctx) {
                     result = .init(markdown: link, files: [], tempDirs: [], source: nil)
                     title = "已收录当前网页"
-                } else if let clip = watcher.clip() {
+                } else if prefs.clipboardFallback, let clip = watcher.clip() {
                     useClip(clip)
                 } else {
-                    Toast.show("没有选中内容，剪贴板也是空的", detail: ctx.appName, style: .warning, actions: [
+                    Toast.show(prefs.clipboardFallback ? "没有选中内容，剪贴板也是空的" : "没有选中内容", detail: ctx.appName, style: .warning, actions: [
                         .init(title: "打开输入框") { [weak self] in self?.show() },
                     ])
                     return
@@ -368,7 +370,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 result = CaptureFormatter.compose(g, ctx)
             }
             if let recipe { title = "已收录到「\(recipe.displayName)」" }
-            let prefs = Prefs.shared
             let finish = { [weak self] (ocr: [String: String]) in
                 let w = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder)
                 defer { for d in result.tempDirs { try? FileManager.default.removeItem(at: d) } }

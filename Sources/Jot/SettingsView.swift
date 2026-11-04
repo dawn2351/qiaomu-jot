@@ -300,10 +300,14 @@ struct RecordSettings: View {
             } footer: {
                 Text("截图文字在本机识别，写进图片下方的折叠块，日后可以搜索到。").font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("空选时收录剪贴板", isOn: $prefs.clipboardFallback)
+                    .help("按 ⌘⇧K 没有选中内容时，收录剪贴板里刚复制的内容；关掉后跳过剪贴板，仍收录刚截的屏、录屏和当前网页")
+            }
         }
         .formStyle(.grouped)
         .frame(width: settingsWidth,
-               height: 540 + (prefs.timestamp ? 44 : 0) + (prefs.timestamp && customTime ? 120 : 0) + (style == .custom ? 112 : 0))
+               height: 652 + (prefs.timestamp ? 44 : 0) + (prefs.timestamp && customTime ? 120 : 0) + (style == .custom ? 112 : 0))
         .onAppear { customTime = !TimeFormats.presets.contains { $0.format == prefs.timeFormat } }
     }
 
