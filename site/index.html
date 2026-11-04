@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>乔木闪记 Jot · 一个快捷键，收进 Obsidian 今日日记 · Mac 与 Windows</title>
+<meta name="description" content="乔木闪记（Jot）是一款免费开源的速记工具，支持 macOS 和 Windows：按一下快捷键，把想法、选中的文字、截图和文件，原样收进 Obsidian 今日日记或任意 Markdown 文件夹，自动带上来源。">
+<link rel="canonical" href="https://jot.qiaomu.ai/">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="乔木闪记 Jot">
+<meta property="og:title" content="乔木闪记 Jot · 念头一闪，已经记下">
+<meta property="og:description" content="一个快捷键，把想法、选中内容、截图和文件收进 Obsidian 今日日记。免费开源，支持 macOS 与 Windows。">
+<meta property="og:url" content="https://jot.qiaomu.ai/">
+<meta property="og:image" content="https://jot.qiaomu.ai/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@vista8">
+<meta name="twitter:image" content="https://jot.qiaomu.ai/assets/og.png">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-512.png">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "乔木闪记 Jot",
+  "alternateName": "Jot",
+  "operatingSystem": "macOS 13+, Windows 10 2004+",
+  "applicationCategory": "ProductivityApplication",
+  "softwareVersion": "1.5.0",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "downloadUrl": ["https://github.com/joeseesun/qiaomu-jot/releases/latest/download/Jot.dmg", "https://github.com/joeseesun/qiaomu-jot/releases/download/windows-v1.0.0/QiaomuJot-Windows-x64.zip"],
+  "url": "https://jot.qiaomu.ai/",
+  "image": "https://jot.qiaomu.ai/assets/og.png",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": { "@type": "Person", "name": "向阳乔木", "url": "https://qiaomu.ai" },
+  "description": "一个快捷键，把想法、选中的文字、截图和文件，原样收进 Obsidian 今日日记或任意 Markdown 文件夹，自动带上来源。"
+}
+</script>
+<!-- Umami: add data-website-id at deploy time -->
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="ig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0b0b0b"/></linearGradient>
+    <symbol id="appicon" viewBox="0 0 1024 1024">
+      <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#ig)"/>
+      <rect x="1.5" y="1.5" width="1021" height="1021" rx="227" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="3"/>
+      <g transform="translate(164.4 160) scale(28)" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></g>
+      <circle cx="760" cy="760" r="180" fill="#141414"/><circle cx="760" cy="760" r="148" fill="#fff"/>
+      <g transform="translate(640 640) scale(10)" fill="#0a0a0a" stroke="#0a0a0a" stroke-width=".6" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></g>
+    </symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.37 12.6c-.02-2.33 1.9-3.45 1.99-3.5-1.08-1.59-2.77-1.8-3.37-1.83-1.43-.15-2.8.85-3.53.85-.73 0-1.85-.83-3.04-.81-1.56.02-3 .91-3.81 2.31-1.62 2.82-.41 6.99 1.17 9.28.77 1.12 1.69 2.38 2.89 2.33 1.16-.05 1.6-.75 3-.75s1.8.75 3.03.73c1.25-.02 2.04-1.14 2.81-2.27.88-1.3 1.25-2.56 1.27-2.62-.03-.01-2.43-.93-2.45-3.72zM14.06 5.75c.64-.78 1.07-1.85.95-2.93-.92.04-2.04.61-2.7 1.39-.59.69-1.11 1.79-.97 2.85 1.03.08 2.07-.52 2.72-1.31z"/></symbol>
+    <symbol id="i-windows" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.1 10.4 4v7.1H3zM11.3 3.9 21 2.5v8.6h-9.7zM3 12h7.4v7.1L3 18zM11.3 12H21v8.6l-9.7-1.4z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 2v4M8 2v4M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.4 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3"/></symbol>
+    <symbol id="i-xlogo" viewBox="0 0 24 24"><path fill="currentColor" d="M18.9 1.2h3.7l-8 9.2 9.4 12.4h-7.4l-5.8-7.6-6.6 7.6H.5L9 13 0 1.2h7.6l5.2 6.9zm-1.3 19.4h2L6.5 3.2H4.3z"/></symbol>
+  </defs>
+</svg>
+
+<header class="nav" id="top">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="乔木闪记 首页">
+      <svg class="brand-icon" aria-hidden="true"><use href="#appicon"/></svg>
+      <span>乔木闪记</span><span class="brand-en">Jot</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="#how">怎么用</a>
+      <a href="#sources">来源</a>
+      <a href="#scenes">场景</a>
+      <a href="#privacy">隐私</a>
+      <a href="#faq">问答</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="icon-btn" href="https://github.com/joeseesun/qiaomu-jot" aria-label="GitHub 源代码" title="GitHub 源代码"><svg><use href="#i-gh"/></svg></a>
+      <a class="btn btn-sm btn-primary" href="#download">下载</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-copy">
+    <a class="pill" href="https://github.com/joeseesun/qiaomu-jot/releases/tag/v1.5.0"><span class="pill-dot"></span>1.5 新增：场景、全库搜索、自动更新<svg><use href="#i-arrow"/></svg></a>
+    <h1>念头一闪，<br class="br-sm">已经记下。</h1>
+    <p class="lede">按一下快捷键，把想法、选中的文字、截图和文件，<br class="br-lg">原样收进 Obsidian 今日日记，或任何 Markdown 文件夹。</p>
+    <div class="hero-actions">
+      <a class="btn btn-lg btn-primary" href="https://github.com/joeseesun/qiaomu-jot/releases/latest/download/Jot.dmg" data-os="mac"><svg><use href="#i-apple"/></svg>下载 Mac 版</a>
+      <a class="btn btn-lg btn-ghost" href="https://github.com/joeseesun/qiaomu-jot/releases/download/windows-v1.0.0/QiaomuJot-Windows-x64.zip" data-os="win"><svg><use href="#i-windows"/></svg>下载 Windows 版</a>
+    </div>
+    <p class="hero-meta">免费 · MIT 开源 · <span data-meta="mac">Mac v1.5.0，macOS 13+，经 Apple 公证</span> · <span data-meta="win">Windows 测试版，Windows 10 2004+ / 11</span></p>
+  </div>
+
+  <div class="wrap">
+    <div class="stage-shell" id="stage-shell">
+      <div class="stage" id="stage" aria-label="乔木闪记演示：在浏览器里选中文字，按 ⌘⇧K 收录进今日日记">
+        <!-- browser -->
+        <div class="win win-browser">
+          <div class="win-bar">
+            <i class="tl r"></i><i class="tl y"></i><i class="tl g"></i>
+            <div class="tab"><span class="logo" style="--src:url(assets/brands/googlechrome.svg)"></span>置身事内 - 读书笔记</div>
+          </div>
+          <div class="article">
+            <div class="art-kicker">第三章 · 政府投融资与债务</div>
+            <div class="art-h">土地财政与城市化</div>
+            <p class="art-p muted-lines"><span></span><span></span><span class="short"></span></p>
+            <p class="art-p real"><span class="sel" id="sel">地方政府不只是“守夜人”，而是深度参与经济发展的“运动员”。</span>土地财政让基础设施得以快速推进，也埋下了债务的隐患。</p>
+            <p class="art-p muted-lines"><span></span><span></span><span></span><span class="short"></span></p>
+          </div>
+        </div>
+        <!-- note -->
+        <div class="win win-note">
+          <div class="win-bar">
+            <i class="tl r"></i><i class="tl y"></i><i class="tl g"></i>
+            <div class="note-title"><span class="logo" style="--src:url(assets/brands/obsidian.svg)"></span>日记 / 2026-11-04.md</div>
+          </div>
+          <div class="note-body" id="note">
+            <div class="note-h">2026-11-04</div>
+            <div class="entry"><p>早上跑步时想到：好的工具，应该让「记录」这件事消失。</p><p class="src">08:12</p></div>
+          </div>
+        </div>
+        <!-- toast -->
+        <div class="toast" id="toast" role="status" aria-live="polite">
+          <span class="toast-ok"><svg><use href="#i-check"/></svg></span>
+          <b>已收录到今日日记</b>
+          <span class="toast-src"><span class="logo" style="--src:url(assets/brands/googlechrome.svg)"></span>置身事内 - 读书笔记</span>
+          <span class="toast-sep"></span>
+          <span class="toast-act">撤销</span><span class="toast-act">补充想法</span>
+        </div>
+        <!-- panel -->
+        <div class="panel" id="panel">
+          <button class="panel-x" type="button" id="panel-x" aria-label="关闭输入框"><svg><use href="#i-x"/></svg></button>
+          <textarea id="panel-input" class="panel-input" rows="3" placeholder="记点什么… 按 ⌘↩ 保存" aria-label="输入要记下的内容" spellcheck="false"></textarea>
+          <div class="panel-foot">
+            <span class="dest"><span class="logo" style="--src:url(assets/brands/obsidian.svg)"></span>rockfish <span class="chev">⌃</span><span class="slash">/</span><b>2026-11-04</b> <span class="chev">⌃</span><span class="cnt" id="cnt">· 已记 1 条</span></span>
+            <span class="panel-tools"><span class="aa">Aa</span><svg><use href="#i-clip"/></svg></span>
+            <button class="save" type="button" id="panel-save">保存 <kbd>⌘↩</kbd></button>
+          </div>
+        </div>
+        <!-- keys -->
+        <div class="keys" id="keys" aria-hidden="true"><kbd>⌘</kbd><kbd>⇧</kbd><kbd id="key3">K</kbd></div>
+        <div class="cursor" id="cursor" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="stage-hint">
+      <span><kbd>⌘</kbd><kbd>⇧</kbd><kbd>K</kbd> 选中即收录</span>
+      <span><kbd>⌘</kbd><kbd>⇧</kbd><kbd>J</kbd> 随手记一句</span>
+      <button class="btn btn-sm btn-ghost" type="button" id="try">亲手试试<svg><use href="#i-arrow"/></svg></button>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section" id="why">
+  <div class="wrap">
+    <div class="eyebrow">为什么做它</div>
+    <h2>记笔记最难的不是写，<br>是打开笔记。</h2>
+    <p class="sub">看到一句好话、截了一张图、冒出一个念头。等你走完下面这几步，那个念头已经凉了。</p>
+    <div class="versus">
+      <div class="vs-card vs-old">
+        <div class="vs-label">以前</div>
+        <ol class="steps">
+          <li><span>1</span>复制那段文字</li>
+          <li><span>2</span>切到 Obsidian</li>
+          <li><span>3</span>找到今天的日记</li>
+          <li><span>4</span>滚到末尾，粘贴</li>
+          <li><span>5</span>回去复制标题和链接，再贴一次</li>
+        </ol>
+        <div class="vs-foot"><b>约 30 秒</b>，打断两次手头的事</div>
+      </div>
+      <div class="vs-card vs-new">
+        <div class="vs-label">现在</div>
+        <div class="vs-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>K</kbd></div>
+        <p>选中的内容连同标题和链接，已经在今日日记的末尾。你不用离开当前窗口。</p>
+        <div class="vs-foot"><b>不到 1 秒</b>，手不离键盘</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TWO SHORTCUTS -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="eyebrow">怎么用</div>
+    <h2>两个快捷键，覆盖所有「先记下来」。</h2>
+    <div class="duo">
+      <article class="duo-card">
+        <div class="duo-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>J</kbd></div>
+        <h3>随手记</h3>
+        <p>在任何地方弹出一个输入框。写字、粘贴截图、拖入图片和视频，按 <kbd class="ik">⌘↩</kbd> 存进今日日记；按 Esc 关掉，草稿还在。</p>
+        <ul class="ticks">
+          <li>边写边渲染 Markdown：粗体、标题、待办、代码</li>
+          <li><kbd class="ik">⌘P</kbd> 临时改存到任意笔记或文件夹</li>
+          <li>输入 <code>#</code> 补全你仓库里已有的标签</li>
+        </ul>
+      </article>
+      <article class="duo-card">
+        <div class="duo-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>K</kbd></div>
+        <h3>一键收录</h3>
+        <p>不弹窗。网页、PDF、电子书、代码里选中的内容，或 Finder 里选中的文件，直接存进去。什么都没选，就收录剪贴板或刚截的屏。</p>
+        <ul class="ticks">
+          <li>提示条上可以撤销，或给刚才那条补一句想法</li>
+          <li>同一份内容只收一次，不会重复</li>
+          <li>两个快捷键都能在设置里改成任何组合</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- SOURCES -->
+<section class="section" id="sources">
+  <div class="wrap">
+    <div class="eyebrow">来源</div>
+    <h2>原样保存，自动带上出处。</h2>
+    <p class="sub">不擅自加列表点和引用符号，复制的是什么就存什么。出处单独写在下一行，日后回看知道它从哪来。</p>
+    <div class="src-demo">
+      <div class="src-tabs" role="tablist" aria-label="来源类型">
+        <button role="tab" aria-selected="true" data-src="web"><span class="logo" style="--src:url(assets/brands/googlechrome.svg)"></span>网页</button>
+        <button role="tab" aria-selected="false" data-src="pdf"><span class="logo" style="--src:url(assets/lucide/file-text.svg)"></span>PDF</button>
+        <button role="tab" aria-selected="false" data-src="book"><span class="logo" style="--src:url(assets/lucide/book-open.svg)"></span>电子书</button>
+        <button role="tab" aria-selected="false" data-src="code"><span class="logo" style="--src:url(assets/brands/cursor.svg)"></span>代码</button>
+        <button role="tab" aria-selected="false" data-src="shot"><span class="logo" style="--src:url(assets/lucide/app-window.svg)"></span>截图</button>
+        <button role="tab" aria-selected="false" data-src="file"><span class="logo" style="--src:url(assets/lucide/folder.svg)"></span>文件</button>
+      </div>
+      <div class="src-body">
+        <div class="src-pane src-in">
+          <div class="pane-label" id="src-app">在 Chrome 里选中</div>
+          <div class="src-input" id="src-input"></div>
+        </div>
+        <div class="src-arrow" aria-hidden="true"><svg><use href="#i-arrow"/></svg></div>
+        <div class="src-pane src-out">
+          <div class="pane-label">写进今日日记</div>
+          <pre class="md" id="src-output"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="marquee" aria-label="可以从这些 App 收录">
+      <div class="marquee-track" id="marquee"></div>
+    </div>
+    <p class="marquee-cap">浏览器、微信、PDF、Apple Books、Kindle、编辑器、终端……能选中文字的地方都能收录，并认出是哪个 App。</p>
+  </div>
+</section>
+
+<!-- SCENES -->
+<section class="section" id="scenes">
+  <div class="wrap">
+    <div class="eyebrow">场景 · 1.5 新增</div>
+    <h2>常去的地方，配一个快捷键。</h2>
+    <p class="sub">最多 6 个场景。选一个预设、按下快捷键、指向一篇笔记或文件夹，三步就能用。<span class="hide-touch">试试在键盘上按 1 到 6。</span></p>
+    <div class="scenes" id="scene-grid">
+      <button class="scene" data-k="1"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>1</kbd></span><b>灵感</b><span class="scene-dest"><svg><use href="#i-file"/></svg>灵感.md</span></button>
+      <button class="scene" data-k="2"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>2</kbd></span><b>读书摘录</b><span class="scene-dest"><svg><use href="#i-folder"/></svg>读书/</span></button>
+      <button class="scene" data-k="3"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>3</kbd></span><b>待办</b><span class="scene-dest"><svg><use href="#i-file"/></svg>待办.md</span></button>
+      <button class="scene" data-k="4"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>4</kbd></span><b>稍后读</b><span class="scene-dest"><svg><use href="#i-file"/></svg>稍后读.md</span></button>
+      <button class="scene" data-k="5"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>5</kbd></span><b>工作日志</b><span class="scene-dest"><svg><use href="#i-folder"/></svg>工作/</span></button>
+      <button class="scene" data-k="6"><span class="scene-keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>6</kbd></span><b>写作素材</b><span class="scene-dest"><svg><use href="#i-folder"/></svg>素材/</span></button>
+    </div>
+    <p class="scene-out" id="scene-out" aria-live="polite">内置灵感、待办、读书摘录、稍后读、工作日志五个预设，也可以自己起名。每个场景可以打开输入框，也可以直接收录。</p>
+  </div>
+</section>
+
+<!-- SEARCH -->
+<section class="section" id="search">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">全库搜索 · 1.5 新增</div>
+      <h2>⌘P，存到哪都行。</h2>
+      <p class="sub">默认存进今日日记。想换地方，⌘P 搜任意笔记和文件夹：模糊匹配、拼音和首字母、别名，连笔记正文都能搜到。选笔记就追加到末尾，选文件夹就新建一篇。</p>
+      <div class="chips" id="q-chips">
+        <button data-q="zssn">zssn</button>
+        <button data-q="zhoubao">zhoubao</button>
+        <button data-q="lg">lg</button>
+        <button data-q="ob">ob</button>
+      </div>
+    </div>
+    <div class="picker" role="search">
+      <label class="picker-q">
+        <svg><use href="#i-search"/></svg>
+        <input id="q" type="text" placeholder="搜索文件夹或笔记…" autocomplete="off" spellcheck="false" aria-label="试试搜索，比如 zssn">
+        <kbd class="esc">esc</kbd>
+      </label>
+      <ul class="picker-list" id="q-list"></ul>
+      <div class="picker-foot"><span><kbd>↑↓</kbd> 选择</span><span><kbd>↩</kbd> 确定</span><span class="grow">选笔记追加到末尾，选文件夹新建笔记</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- BENTO -->
+<section class="section" id="more">
+  <div class="wrap">
+    <div class="eyebrow">细节</div>
+    <h2>小工具，该有的都有。</h2>
+    <div class="bento">
+      <article class="b-card b-wide b-dark">
+        <div class="b-text">
+          <h3>Markdown 实时渲染</h3>
+          <p>编辑时就看到粗体、标题、列表和代码。⌘B ⌘I ⌘K 这些快捷键照常用，⌘/ 展开格式栏，列表回车自动续写。</p>
+        </div>
+        <img src="assets/shots/panel-dark.webp" alt="深色模式下的输入框：标题、待办、引用、高亮实时渲染，下方是格式栏" loading="lazy" width="1296" height="640">
+      </article>
+      <article class="b-card">
+        <h3>截图里的字也能搜到</h3>
+        <p>本机识别中英文，写进图片下方默认折叠的块里。</p>
+        <pre class="md md-sm">![[截屏 14.32.png]]
+<span class="md-dim">&gt; [!note]- 图中文字</span>
+<span class="md-dim">&gt;</span> 好的工具让记录这件事消失</pre>
+      </article>
+      <article class="b-card">
+        <h3>不用 Obsidian 也行</h3>
+        <p>选普通文件夹就用标准 Markdown 链接。Typora、VS Code、iA Writer 都能打开。</p>
+        <pre class="md md-sm">日记/2026-11-04.md
+附件/截屏 14.32.png
+<span class="md-dim">![](../附件/截屏 14.32.png)</span></pre>
+      </article>
+      <article class="b-card">
+        <h3>随时撤销</h3>
+        <p>存错了？提示条和菜单栏都能撤销上一条，或者给它补一句想法。</p>
+        <div class="mini-toast"><span class="toast-ok"><svg><use href="#i-check"/></svg></span>已保存<span class="toast-sep"></span><u>撤销</u></div>
+      </article>
+      <article class="b-card">
+        <h3>安静地自动更新</h3>
+        <p>有新版本时，菜单栏旁轻轻提示一下，一键更新。不弹窗打断你。每个更新包都校验签名。</p>
+      </article>
+      <article class="b-card">
+        <h3>剪贴板和截图</h3>
+        <p>什么都没选时按 ⌘⇧K，收录剪贴板里的文字、图片、视频、文件，或者刚截的屏。同一份只收一次。</p>
+      </article>
+      <article class="b-card">
+        <h3>记录格式随你</h3>
+        <p>原样、时间在前、列表、引用块、Callout，或者写你自己的模板。改完立刻预览。</p>
+        <div class="fmt"><span class="on">原样</span><span>列表</span><span>引用</span><span>Callout</span><span>自定义</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section class="section" id="gallery">
+  <div class="wrap">
+    <div class="eyebrow">真实界面</div>
+    <h2>没有修图，都是 App 自己画的。</h2>
+    <p class="sub">下面的截图由乔木闪记自带的截图模式直接渲染，和你装上看到的一样。</p>
+    <div class="gallery">
+      <figure><picture><source srcset="assets/shots/picker-q-dark.webp" media="(prefers-color-scheme: dark)"><img src="assets/shots/picker-q.webp" alt="⌘P 全库搜索：名称匹配和笔记正文匹配" loading="lazy" width="1320" height="1002"></picture><figcaption><b>⌘P 全库搜索</b>按名称搜，也能搜到笔记正文里的句子</figcaption></figure>
+      <figure><picture><source srcset="assets/shots/scenes-dark.webp" media="(prefers-color-scheme: dark)"><img src="assets/shots/scenes.webp" alt="场景设置：灵感与读书摘录，各自的快捷键和保存位置" loading="lazy" width="1160" height="1316"></picture><figcaption><b>场景</b>每个场景一个快捷键：打开输入框，或直接收录</figcaption></figure>
+      <figure><picture><source srcset="assets/shots/record-dark.webp" media="(prefers-color-scheme: dark)"><img src="assets/shots/record.webp" alt="记录格式设置：实时预览、样式、时间和来源开关" loading="lazy" width="1136" height="1176"></picture><figcaption><b>记录格式</b>样式、时间、来源开关，实时预览写出来的样子</figcaption></figure>
+      <figure><picture><source srcset="assets/shots/about-dark.webp" media="(prefers-color-scheme: dark)"><img src="assets/shots/about.webp" alt="关于页：版本 1.5.0、检查更新、反馈问题、使用说明、源代码" loading="lazy" width="1160" height="1192"></picture><figcaption><b>关于</b>版本、检查更新、反馈、使用说明、源代码</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- PRIVACY -->
+<section class="section" id="privacy">
+  <div class="wrap">
+    <div class="privacy">
+      <div>
+        <div class="eyebrow">隐私</div>
+        <h2>你的笔记，只在你的 Mac 上。</h2>
+        <p class="sub">不注册、不同步、不上传、不统计。乔木闪记只负责把东西快速放进你的文件夹，剩下的交给你习惯的编辑器。</p>
+      </div>
+      <ul class="priv-list">
+        <li><b>全部本机完成</b><span>文字识别、格式转换、搜索，都不联网。</span></li>
+        <li><b>唯一的网络请求</b><span>粘贴裸链接时取网页标题。可以在设置里关掉。</span></li>
+        <li><b>不碰密码</b><span>密码框、1Password 等密码管理器的内容一律不收录。</span></li>
+        <li><b>剪贴板原样还给你</b><span>收录网页时会模拟一次 ⌘C，读完立刻恢复，并标记为临时内容，不进剪贴板历史。</span></li>
+        <li><b>权限用到才问</b><span>「辅助功能」读取选中文字；浏览器标题、桌面截图只在第一次用到时请求。</span></li>
+        <li><b>代码公开</b><span>MIT 开源，每一行都能在 GitHub 上看到。</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- START -->
+<section class="section" id="start">
+  <div class="wrap">
+    <div class="eyebrow">开始</div>
+    <h2>三步，一分钟。</h2>
+    <ol class="start">
+      <li><span class="n">1</span><b>下载并安装</b><p>Mac：拖进「应用程序」，经 Apple 公证，双击即可打开。Windows：解压后运行 QiaomuJot.exe。</p></li>
+      <li><span class="n">2</span><b>选保存位置，开启辅助功能</b><p>装了 Obsidian 会自动选中最近的仓库；没装就存在「文稿/乔木闪记」。设置里的清单会带你走完。</p></li>
+      <li><span class="n">3</span><b>在任何地方按 ⌘⇧J</b><p>写一句话，按 ⌘↩（Windows 上是 Win+J 和 Ctrl+Enter）。打开今天的日记，它已经在那儿了。</p></li>
+    </ol>
+    <div class="cta" id="download">
+      <svg class="cta-icon" aria-hidden="true"><use href="#appicon"/></svg>
+      <h2>念头一闪，已经记下。</h2>
+      <p>免费、开源，Mac 和 Windows 都能用。</p>
+      <div class="dl-grid">
+        <a class="dl-card" href="https://github.com/joeseesun/qiaomu-jot/releases/latest/download/Jot.dmg" data-os="mac">
+          <svg class="dl-os"><use href="#i-apple"/></svg>
+          <b>macOS</b>
+          <span>v1.5.0 · 6 MB · macOS 13+</span>
+          <span>Apple 芯片与 Intel 通用，经 Apple 公证，内置自动更新</span>
+          <span class="dl-btn"><svg><use href="#i-download"/></svg>下载 Jot.dmg</span>
+        </a>
+        <a class="dl-card" href="https://github.com/joeseesun/qiaomu-jot/releases/download/windows-v1.0.0/QiaomuJot-Windows-x64.zip" data-os="win">
+          <svg class="dl-os"><use href="#i-windows"/></svg>
+          <b>Windows <em>测试版</em></b>
+          <span>v1.0.0 · Windows 10 2004+ / 11 · x64</span>
+          <span>快捷键 Win+J / Win+K，免安装，解压即用</span>
+          <span class="dl-btn"><svg><use href="#i-download"/></svg>下载 .zip</span>
+        </a>
+      </div>
+      <p class="hero-meta">Windows 版暂未代码签名，首次运行若出现 SmartScreen 提示，点「更多信息 → 仍要运行」。<a href="https://github.com/joeseesun/qiaomu-jot/releases">全部版本与更新日志</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section" id="faq">
+  <div class="wrap faq-wrap">
+    <div>
+      <div class="eyebrow">问答</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq">
+      <details><summary>真的免费吗？</summary><p>是的。乔木闪记以 MIT 协议开源，没有付费版，没有广告，也不收集数据。如果觉得好用，可以在页脚请作者喝杯咖啡。</p></details>
+      <details><summary>一定要用 Obsidian 吗？</summary><p>不用。保存位置选普通文件夹时，会写成 <code>日记/2026-11-04.md</code>，图片放在 <code>附件/</code>，用标准 Markdown 链接，任何编辑器都能打开。选的是 Obsidian 仓库时，会沿用「日记」插件的文件夹、文件名、模板和附件设置。</p></details>
+      <details><summary>为什么需要「辅助功能」权限？</summary><p>为了读取其他 App 里你选中的文字，这是 macOS 规定的权限。只用 ⌘⇧J 随手记的话，可以不开。</p></details>
+      <details><summary>会上传我的内容吗？</summary><p>不会。所有处理都在本机完成。唯一的联网行为是「粘贴链接时换成网页标题」，它只访问你粘贴的那个网页，可以在设置里关闭。</p></details>
+      <details><summary>怎么更新？</summary><p>Mac 版从 1.5.0 起内置自动更新：有新版时菜单栏旁会轻提示，点一下即可；从 1.4.0 升级需要手动下载一次。Windows 测试版暂时需要到本页重新下载。</p></details>
+      <details><summary>支持 Windows 吗？</summary><p>支持。Windows 版是社区贡献者 <a href="https://github.com/w18774994563">@w18774994563</a> 用 .NET 9 + WPF 写的原生版本，需要 Windows 10 2004 或 Windows 11（x64）。快捷键是 Win+J 随手记、Win+K 一键收录，同样支持本机文字识别和 Obsidian 仓库。它目前是测试版：还没有代码签名和自动更新，功能也比 Mac 版少一些。iPhone 和 Android 暂时没有。</p></details>
+      <details><summary>快捷键和别的软件冲突了怎么办？</summary><p>在设置里点一下快捷键，按下新的组合即可，任何组合都行。</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <a class="brand" href="#top"><svg class="brand-icon" aria-hidden="true"><use href="#appicon"/></svg><span>乔木闪记</span><span class="brand-en">Jot</span></a>
+      <p>由 <a href="https://qiaomu.ai">向阳乔木</a> 设计和开发。前字节/TikTok 商业化 AI 产品经理，把 AI 前沿变化转译成可执行的工作流。</p>
+    </div>
+    <div class="foot-cols">
+      <div><b>产品</b><a href="https://github.com/joeseesun/qiaomu-jot/releases/latest/download/Jot.dmg">Mac 版下载</a><a href="https://github.com/joeseesun/qiaomu-jot/releases/download/windows-v1.0.0/QiaomuJot-Windows-x64.zip">Windows 版下载</a><a href="https://github.com/joeseesun/qiaomu-jot/releases">更新日志</a><a href="https://github.com/joeseesun/qiaomu-jot#readme">使用说明</a><a href="https://github.com/joeseesun/qiaomu-jot/issues">反馈问题</a></div>
+      <div><b>作者</b><a href="https://qiaomu.ai">qiaomu.ai</a><a href="https://blog.qiaomu.ai">博客</a><a href="https://tuijian.qiaomu.ai/">乔木推荐</a><a href="https://x.com/vista8">X @vista8</a></div>
+    </div>
+    <div class="foot-actions">
+      <button class="icon-btn" type="button" data-modal="m-follow" aria-label="关注" title="关注"><svg><use href="#i-chat"/></svg></button>
+      <button class="icon-btn" type="button" data-modal="m-reward" aria-label="打赏" title="打赏"><svg><use href="#i-gift"/></svg></button>
+      <a class="icon-btn" href="https://github.com/joeseesun/qiaomu-jot" aria-label="GitHub" title="GitHub"><svg><use href="#i-gh"/></svg></a>
+      <a class="icon-btn" href="https://x.com/vista8" aria-label="X" title="X"><svg><use href="#i-xlogo"/></svg></a>
+    </div>
+  </div>
+  <div class="wrap foot-legal">MIT © 2026 向阳乔木 · 字体 Geist（OFL）· 图标 Lucide（ISC）与 Simple Icons（CC0）· 品牌标识归各自所有者</div>
+</footer>
+
+<dialog class="modal" id="m-follow" aria-labelledby="m-follow-t">
+  <button class="modal-x" type="button" data-close aria-label="关闭"><svg><use href="#i-x"/></svg></button>
+  <h3 id="m-follow-t">关注向阳乔木</h3>
+  <img src="assets/wechat-qr.jpg" alt="微信公众号「向阳乔木推荐看」二维码" width="220" height="220">
+  <p>微信扫码关注公众号「向阳乔木推荐看」</p>
+  <div class="modal-links"><a href="https://github.com/joeseesun/"><svg><use href="#i-gh"/></svg>GitHub</a><a href="https://x.com/vista8"><svg><use href="#i-xlogo"/></svg>@vista8</a></div>
+</dialog>
+<dialog class="modal" id="m-reward" aria-labelledby="m-reward-t">
+  <button class="modal-x" type="button" data-close aria-label="关闭"><svg><use href="#i-x"/></svg></button>
+  <h3 id="m-reward-t">打赏支持</h3>
+  <img src="assets/reward-qr.png" alt="向阳乔木打赏二维码" width="220" height="220">
+  <p>感谢支持乔木持续做好用的小工具</p>
+</dialog>
+
+<script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Publish (self-contained, single file, x64)
+        run: >
+          dotnet publish windows/QiaomuJot/QiaomuJot.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -o out
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out\QiaomuJot.exe -ArgumentList "--selftest" -Wait -PassThru
+          Write-Host "selftest exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Check runtime files
+        shell: pwsh
+        run: |
+          foreach ($f in @("out\Resources\app.ico", "out\Resources\Sounds\kenney-confirmation_001.wav")) {
+            if (-not (Test-Path $f)) { Write-Error "missing $f"; exit 1 }
+          }
+      - name: Zip
+        shell: pwsh
+        run: |
+          Remove-Item out\*.pdb -ErrorAction SilentlyContinue
+          Compress-Archive -Path out\* -DestinationPath QiaomuJot-Windows-x64.zip
+          Get-FileHash QiaomuJot-Windows-x64.zip -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QiaomuJot-Windows-x64
+          path: QiaomuJot-Windows-x64.zip
+          retention-days: 30

@@ -19,11 +19,8 @@
 
   <ItemGroup>
     <Resource Include="Resources\icon.png" />
-    <None Include="Resources\app.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Resources\Sounds\*.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <!-- Loaded from disk at runtime (tray icon, shortcuts, sounds): keep them next to the exe in single-file publishes. -->
+    <Content Include="Resources\app.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="Resources\Sounds\*.wav" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 </Project>
