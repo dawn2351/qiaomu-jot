@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://jot.qiaomu.ai/sitemap.xml
