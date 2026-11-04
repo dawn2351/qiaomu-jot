@@ -1,0 +1,13 @@
+// Product site for 乔木闪记 Jot: static files in site/, served by Cloudflare Workers at jot.qiaomu.ai.
+// Deploy: wrangler deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qiaomu-jot",
+  "compatibility_date": "2026-09-18",
+  "assets": {
+    "directory": "site"
+  },
+  "routes": [
+    { "pattern": "jot.qiaomu.ai", "custom_domain": true }
+  ]
+}
