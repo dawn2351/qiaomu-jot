@@ -839,6 +839,13 @@ func selftest() -> Int32 {
     _ = try? top.append(content: "第二条", attachments: [], to: topNote)
     check("writer: untitled note puts newest first", (try? String(contentsOf: topNote, encoding: .utf8)) ?? "",
           "第二条\n\n第一条\n\n未加标题的正文")
+    try? "旧正文".write(to: topNote, atomically: true, encoding: .utf8)
+    _ = try? top.append(content: "---\nexample: value\n---", attachments: [], to: topNote)
+    check("writer: a captured delimiter stays in the body",
+          (try? String(contentsOf: topNote, encoding: .utf8)) ?? "", "\n---\nexample: value\n---\n\n旧正文")
+    try? History.undoLast()
+    check("writer: undo also removes the delimiter guard",
+          (try? String(contentsOf: topNote, encoding: .utf8)) ?? "", "旧正文")
     try? "普通标题\n===\n旧正文".write(to: topNote, atomically: true, encoding: .utf8)
     _ = try? top.append(content: "新正文", attachments: [], to: topNote)
     check("writer: keep an underlined H1 intact", (try? String(contentsOf: topNote, encoding: .utf8)) ?? "",

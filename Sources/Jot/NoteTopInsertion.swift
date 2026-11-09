@@ -15,7 +15,7 @@ struct NoteTopInsertion {
         return data.starts(with: [0xEF, 0xBB, 0xBF]) ? "\u{FEFF}" + text : text
     }
 
-    static func plan(in note: String, isList: Bool) -> Self {
+    static func plan(in note: String, for entry: String, isList: Bool) -> Self {
         let text = note as NSString
         let start = note.hasPrefix("\u{FEFF}") ? 1 : 0
         func line(at index: Int) -> (body: String, end: Int, newline: String)? {
@@ -66,6 +66,11 @@ struct NoteTopInsertion {
         if offset > start {
             if prefix.last?.isNewline != true { leading += newline }
             if !followsBlankLine { leading += newline }
+        }
+        if offset == start, offset < text.length,
+           entry.prefix(while: { !$0.isNewline }).replacingOccurrences(of: #"[ \t]+$"#, with: "", options: .regularExpression) == "---" {
+            // A captured delimiter at byte zero would turn body text into document properties.
+            leading = newline
         }
         let tightList = isList && line(at: offset)?.body.hasPrefix("- ") == true
         let trailing = offset < text.length && !tightList ? newline : ""

@@ -176,7 +176,7 @@
                     <StackPanel HorizontalAlignment="Center" Margin="0,10,0,0">
                         <Image Source="/Resources/icon.png" Width="64" Height="64" Margin="0,0,0,12" RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock Text="乔木闪记 · Jot" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#111111" />
-                        <TextBlock Text="Windows 原生移植版 · v1.0.0" FontSize="12.5" Foreground="#777777" HorizontalAlignment="Center" Margin="0,4,0,14" />
+                        <TextBlock Text="Windows 原生移植版 · v1.0.1" FontSize="12.5" Foreground="#777777" HorizontalAlignment="Center" Margin="0,4,0,14" />
 
                         <TextBlock Text="按一个快捷键，把灵感、选中文字和截图收进 Obsidian 或任意 Markdown 文件夹。" HorizontalAlignment="Center" Foreground="#444444" FontSize="13" Margin="0,0,0,16" />
 

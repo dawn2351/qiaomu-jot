@@ -125,6 +125,9 @@ public static class SelfTestRunner
                 (await File.ReadAllTextAsync(freshNote)) == "# 新日记\n\n新条目\n");
             Assert("Underlined title stays above new text",
                 NoteTopInsertion.Insert("标题\n===\n旧正文", "新正文") == "标题\n===\n\n新正文\n\n旧正文");
+            Assert("A captured delimiter stays in the body",
+                NoteTopInsertion.Insert("旧正文", "---\nexample: value\n---") ==
+                "\n---\nexample: value\n---\n\n旧正文");
             byte[] invalid = [0xff, 0xfe, 0x00];
             await File.WriteAllBytesAsync(note, invalid);
             Assert("Failed UTF-8 read leaves original untouched",

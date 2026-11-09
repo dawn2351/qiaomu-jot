@@ -72,6 +72,11 @@ internal static class NoteTopInsertion
             if (!followsBlankLine)
                 leading += newline;
         }
+        if (offset == start && offset < note.Length && LineAt(entry, 0).Body.TrimEnd(' ', '\t') == "---")
+        {
+            // Keep a captured delimiter in the body, outside the document properties.
+            leading = newline;
+        }
         string trailing = offset < note.Length ? newline : "";
         return note.Insert(offset, leading + entry.ReplaceLineEndings(newline) + newline + trailing);
     }

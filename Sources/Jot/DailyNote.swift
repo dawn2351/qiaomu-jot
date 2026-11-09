@@ -174,7 +174,7 @@ struct DailyNoteWriter {
 
         var topInsertion: NoteTopInsertion?
         if var original = topOriginal {
-            let insertion = NoteTopInsertion.plan(in: original, isList: format.isList)
+            let insertion = NoteTopInsertion.plan(in: original, for: entry, isList: format.isList)
             entry = insertion.normalize(entry)
             let index = String.Index(utf16Offset: insertion.offset, in: original)
             original.insert(contentsOf: insertion.wrapping(entry), at: index)
