@@ -4,6 +4,7 @@
 # Accessibility grant. RELEASE=1 adds a secure timestamp (needed for notarization).
 set -euo pipefail
 cd "$(dirname "$0")"
+ROOT=$(pwd -P)
 NAME="Jot"
 NAME_ZH="乔木闪记"
 VERSION=$(cat VERSION)
@@ -31,9 +32,12 @@ if ! otool -l "$APP/Contents/MacOS/Jot" | grep -q "@executable_path/../Framework
 fi
 
 # Icon Composer icon → Assets.car (macOS 26+) and AppIcon.icns (older systems).
-xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
+if ! xcrun actool "$ROOT/Resources/AppIcon.icon" --compile "$ROOT/$APP/Contents/Resources" --platform macosx \
   --minimum-deployment-target 13.0 --app-icon AppIcon --target-device mac \
-  --output-partial-info-plist build/icon-partial.plist >/dev/null
+  --output-partial-info-plist "$ROOT/build/icon-partial.plist" >build/actool.log 2>&1; then
+  cat build/actool.log >&2
+  exit 1
+fi
 
 cat > "$APP/Contents/Info.plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
