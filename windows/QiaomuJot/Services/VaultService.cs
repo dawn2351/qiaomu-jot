@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using QiaomuJot.Models;
 
@@ -13,6 +14,9 @@ public class VaultService
 
     private string? _lastNotePath;
     private string? _lastNoteOriginalContent;
+    private string? _lastPrependedNoteContent;
+    private readonly SemaphoreSlim _writeGate = new(1);
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public string GetTodayNotePath(DateTime? date = null)
     {
@@ -142,6 +146,7 @@ public class VaultService
 
     public async Task<bool> AppendEntryAsync(string markdownEntry, string? targetNotePath = null)
     {
+        await _writeGate.WaitAsync().ConfigureAwait(false);
         try
         {
             var notePath = targetNotePath ?? GetTodayNotePath();
@@ -151,10 +156,13 @@ public class VaultService
                 Directory.CreateDirectory(dir);
             }
 
-            string originalContent = string.Empty;
+            bool prepend = AppSettings.Current.PrependEntries;
+            string originalContent;
             if (File.Exists(notePath))
             {
-                originalContent = await File.ReadAllTextAsync(notePath, Encoding.UTF8).ConfigureAwait(false);
+                originalContent = prepend
+                    ? StrictUtf8.GetString(await File.ReadAllBytesAsync(notePath).ConfigureAwait(false))
+                    : await File.ReadAllTextAsync(notePath, Encoding.UTF8).ConfigureAwait(false);
             }
             else
             {
@@ -163,19 +171,27 @@ public class VaultService
                 originalContent = $"# {title}\n\n";
             }
 
+            string updatedContent;
+            if (prepend)
+            {
+                updatedContent = NoteTopInsertion.Insert(originalContent, markdownEntry.Trim());
+                await ReplaceNoteAsync(notePath, updatedContent).ConfigureAwait(false);
+            }
+            else
+            {
+                var sb = new StringBuilder();
+                sb.Append(originalContent.TrimEnd());
+                if (!string.IsNullOrEmpty(originalContent.Trim()))
+                    sb.Append("\n\n");
+                sb.Append(markdownEntry.Trim());
+                sb.Append("\n");
+                updatedContent = sb.ToString();
+                await File.WriteAllTextAsync(notePath, updatedContent, new UTF8Encoding(false)).ConfigureAwait(false);
+            }
+
             _lastNotePath = notePath;
             _lastNoteOriginalContent = originalContent;
-
-            var sb = new StringBuilder();
-            sb.Append(originalContent.TrimEnd());
-            if (!string.IsNullOrEmpty(originalContent.Trim()))
-            {
-                sb.Append("\n\n");
-            }
-            sb.Append(markdownEntry.Trim());
-            sb.Append("\n");
-
-            await File.WriteAllTextAsync(notePath, sb.ToString(), new UTF8Encoding(false)).ConfigureAwait(false);
+            _lastPrependedNoteContent = prepend ? updatedContent : null;
             return true;
         }
         catch (Exception ex)
@@ -183,24 +199,57 @@ public class VaultService
             System.Diagnostics.Debug.WriteLine($"Failed to append entry: {ex.Message}");
             return false;
         }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private static async Task ReplaceNoteAsync(string path, string content)
+    {
+        var tempPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, $".jot-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, content, StrictUtf8).ConfigureAwait(false);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
     }
 
     public bool UndoLast()
     {
-        if (string.IsNullOrEmpty(_lastNotePath) || _lastNoteOriginalContent == null)
+        if (!_writeGate.Wait(0))
             return false;
-
         try
         {
-            File.WriteAllText(_lastNotePath, _lastNoteOriginalContent, new UTF8Encoding(false));
+            if (string.IsNullOrEmpty(_lastNotePath) || _lastNoteOriginalContent == null)
+                return false;
+            if (_lastPrependedNoteContent != null)
+            {
+                if (StrictUtf8.GetString(File.ReadAllBytes(_lastNotePath)) != _lastPrependedNoteContent)
+                    return false;
+                ReplaceNoteAsync(_lastNotePath, _lastNoteOriginalContent).GetAwaiter().GetResult();
+            }
+            else
+            {
+                File.WriteAllText(_lastNotePath, _lastNoteOriginalContent, new UTF8Encoding(false));
+            }
             _lastNotePath = null;
             _lastNoteOriginalContent = null;
+            _lastPrependedNoteContent = null;
             return true;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to undo: {ex.Message}");
             return false;
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 }

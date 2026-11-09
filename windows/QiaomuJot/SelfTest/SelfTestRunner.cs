@@ -73,12 +73,14 @@ public static class SelfTestRunner
         // 5. Daily Note Writing & Atomic Undo test
         var tempDir = Path.Combine(Path.GetTempPath(), "QiaomuJot_Test_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
+        var oldVault = s!.VaultPath;
+        var oldIsObsidian = s.IsObsidian;
+        var oldPrepend = s.PrependEntries;
         try
         {
-            var oldVault = s!.VaultPath;
-            var oldIsObsidian = s.IsObsidian;
             s.VaultPath = tempDir;
             s.IsObsidian = true;
+            s.PrependEntries = false;
 
             var todayNote = VaultService.Instance.GetTodayNotePath();
             Assert("Today note path valid", todayNote.EndsWith(".md"));
@@ -97,12 +99,43 @@ public static class SelfTestRunner
             var contentAfterUndo = await File.ReadAllTextAsync(todayNote);
             Assert("Content restored after undo", !contentAfterUndo.Contains(entryText));
 
-            // Restore
-            s.VaultPath = oldVault;
-            s.IsObsidian = oldIsObsidian;
+            var note = Path.Combine(tempDir, "置顶.md");
+            const string metadata = "\uFEFF---\r\ntype: jot\r\n...\r\n\r\n# 笔记 📘\r\n";
+            const string original = metadata + "旧正文  ";
+            var utf8 = new UTF8Encoding(false);
+            await File.WriteAllTextAsync(note, original, utf8);
+            s.PrependEntries = true;
+            var first = VaultService.Instance.AppendEntryAsync("第一条", note);
+            var second = VaultService.Instance.AppendEntryAsync("第二条", note);
+            var saved = await Task.WhenAll(first, second);
+            var prepended = utf8.GetString(await File.ReadAllBytesAsync(note));
+            Assert("Newest first after BOM, YAML and heading with CRLF",
+                saved[0] && saved[1] && prepended == metadata + "\r\n第二条\r\n\r\n第一条\r\n\r\n旧正文  ");
+            Assert("Undo keeps older prepend and exact original bytes",
+                VaultService.Instance.UndoLast() &&
+                utf8.GetString(await File.ReadAllBytesAsync(note)) == metadata + "\r\n第一条\r\n\r\n旧正文  ");
+            await VaultService.Instance.AppendEntryAsync("待撤销", note);
+            await File.AppendAllTextAsync(note, "\r\n外部编辑", utf8);
+            Assert("Undo refuses to overwrite external edits", !VaultService.Instance.UndoLast() &&
+                (await File.ReadAllTextAsync(note)).EndsWith("外部编辑", StringComparison.Ordinal));
+
+            var freshNote = Path.Combine(tempDir, "新日记.md");
+            Assert("New note keeps its generated title",
+                await VaultService.Instance.AppendEntryAsync("新条目", freshNote) &&
+                (await File.ReadAllTextAsync(freshNote)) == "# 新日记\n\n新条目\n");
+            Assert("Underlined title stays above new text",
+                NoteTopInsertion.Insert("标题\n===\n旧正文", "新正文") == "标题\n===\n\n新正文\n\n旧正文");
+            byte[] invalid = [0xff, 0xfe, 0x00];
+            await File.WriteAllBytesAsync(note, invalid);
+            Assert("Failed UTF-8 read leaves original untouched",
+                !await VaultService.Instance.AppendEntryAsync("新正文", note) &&
+                (await File.ReadAllBytesAsync(note)).AsSpan().SequenceEqual(invalid));
         }
         finally
         {
+            s.VaultPath = oldVault;
+            s.IsObsidian = oldIsObsidian;
+            s.PrependEntries = oldPrepend;
             try { Directory.Delete(tempDir, true); } catch { }
         }
 

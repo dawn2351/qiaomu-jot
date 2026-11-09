@@ -36,6 +36,7 @@ public partial class SettingsWindow : Window
 
         TxtDailyFolder.Text = s.DailyFolder;
         TxtDailyFormat.Text = s.DailyFormat;
+        ChkPrependEntries.IsChecked = s.PrependEntries;
         TxtAttachmentFolder.Text = s.AttachmentFolder;
 
         TxtShortcutCapture.Text = s.CaptureShortcut;
@@ -148,6 +149,7 @@ public partial class SettingsWindow : Window
         s.IsObsidian = RbObsidian.IsChecked == true;
         s.DailyFolder = TxtDailyFolder.Text.Trim();
         s.DailyFormat = TxtDailyFormat.Text.Trim();
+        s.PrependEntries = ChkPrependEntries.IsChecked == true;
         s.AttachmentFolder = TxtAttachmentFolder.Text.Trim();
 
         s.CaptureShortcut = TxtShortcutCapture.Text.Trim();
