@@ -197,7 +197,7 @@ struct DestinationField: View {
                                 Image(systemName: d.symbol).frame(width: 14)
                                 Text(Recipe.label(d)).lineLimit(1).truncationMode(.head)
                                 Spacer()
-                                Text(d.kind == .folder ? "新建笔记" : d.kind == .daily ? "" : "追加").foregroundStyle(.secondary)
+                                Text(d.kind == .folder ? "新建笔记" : d.kind == .daily ? "" : "写入").foregroundStyle(.secondary)
                             }
                             .font(.system(size: 12))
                             .padding(.horizontal, 8).padding(.vertical, 5)
@@ -223,7 +223,8 @@ struct DestinationField: View {
         case .note:
             if destination.path.contains("..") { return ("路径不能跳出仓库", true) }
             let exists = FileManager.default.fileExists(atPath: vault.appendingPathComponent(destination.path).path)
-            return (exists ? "追加到这篇笔记末尾" : "笔记还不存在，第一次保存时创建", !exists)
+            let writeHint = Prefs.shared.prependEntries ? "写入这篇笔记开头" : "追加到这篇笔记末尾"
+            return (exists ? writeHint : "笔记还不存在，第一次保存时创建", !exists)
         }
     }
 
@@ -247,7 +248,7 @@ struct DestinationField: View {
         p.canCreateDirectories = true
         p.allowedContentTypes = [.init(filenameExtension: "md")!, .folder]
         p.directoryURL = vault
-        p.message = "选择一篇笔记（追加到末尾）或一个文件夹（新建笔记）"
+        p.message = "选择要写入的笔记，或选择文件夹来新建笔记"
         guard p.runModal() == .OK, let u = p.url else { return }
         let root = vault.standardizedFileURL.path, path = u.standardizedFileURL.path
         guard path == root || path.hasPrefix(root + "/") else { NSSound.beep(); return }

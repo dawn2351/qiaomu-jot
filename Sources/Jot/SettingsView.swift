@@ -375,12 +375,13 @@ struct SaveSettings: View {
                     Text("今日日记").tag(false)
                     Text("上次使用的位置").tag(true)
                 }
+                Toggle("新内容插入正文开头", isOn: $prefs.prependEntries)
                 LabeledContent("插入到标题下") {
-                    TextField("", text: $prefs.insertHeading, prompt: Text("留空则追加到末尾"))
+                    TextField("", text: $prefs.insertHeading, prompt: Text("可选，仅今日日记"))
                         .multilineTextAlignment(.trailing)
                 }
             } footer: {
-                Text("填写标题（如「随记」）后，今日日记的内容放进该标题的段落末尾，没有则自动创建。")
+                Text("置顶会保留文档开头的 YAML 属性和一级标题。今日日记优先使用指定标题，写入该节末尾；标题不存在时会新建。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {

@@ -54,7 +54,8 @@ struct DestinationPicker: View {
                 keyHint("↩", "确定")
                 Button { model.closePicker() } label: { keyHint("esc", "返回") }.buttonStyle(.plain)
                 Spacer()
-                Text("选笔记追加到末尾，选文件夹新建笔记").font(Theme.sans(11)).foregroundStyle(Theme.subtle)
+                Text(Prefs.shared.prependEntries ? "选笔记写入开头，选文件夹新建笔记" : "选笔记追加到末尾，选文件夹新建笔记")
+                    .font(Theme.sans(11)).foregroundStyle(Theme.subtle)
             }
             .padding(.horizontal, 20).frame(height: 34)
         }
@@ -113,8 +114,8 @@ private struct DestinationRow: View {
 
     private var hint: String {
         switch destination.kind {
-        case .daily: return "追加到今天"
-        case .note: return "追加到末尾"
+        case .daily: return "写入今日日记"
+        case .note: return Prefs.shared.prependEntries ? "写入开头" : "追加到末尾"
         case .folder: return "新建笔记"
         }
     }

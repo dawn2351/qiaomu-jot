@@ -17,6 +17,7 @@ public class AppSettings
     public bool IsObsidian { get; set; } = true;
     public string DailyFolder { get; set; } = "日记";
     public string DailyFormat { get; set; } = "YYYY-MM-DD";
+    public bool PrependEntries { get; set; }
     public string AttachmentFolder { get; set; } = "附件";
     public string CaptureShortcut { get; set; } = "Win+J";
     public string QuickSaveShortcut { get; set; } = "Win+K";
