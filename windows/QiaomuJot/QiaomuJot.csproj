@@ -10,7 +10,7 @@
     <AssemblyName>QiaomuJot</AssemblyName>
     <RootNamespace>QiaomuJot</RootNamespace>
     <StartupObject>QiaomuJot.App</StartupObject>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Qiaomu Jot Team</Authors>
     <Company>Qiaomu Jot</Company>
     <Product>乔木闪记 · Jot</Product>

@@ -367,7 +367,8 @@ final class CaptureModel: ObservableObject {
     private func write(ocr: [String: String]) {
         let prefs = Prefs.shared
         guard let vault = prefs.vaultURL else { return }
-        let writer = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder)
+        let writer = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder,
+                                     prependsEntries: prefs.prependEntries)
         History.skipped = []
         do {
             let note: URL

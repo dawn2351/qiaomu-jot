@@ -85,6 +85,7 @@ struct DailyNoteWriter {
     let vault: URL
     let attachmentOverride: String   // "" = follow Obsidian's setting
     var format: EntryFormat = .current
+    var prependsEntries = false
 
     private var fm: FileManager { .default }
     /// Obsidian vault → ![[embeds]] and callouts; plain folder → standard Markdown links and <details>.
@@ -153,21 +154,33 @@ struct DailyNoteWriter {
         return s
     }
 
-    /// Appends a capture rendered with the entry format. `target` appends to an arbitrary note
-    /// instead of today's daily note (no template, no heading). Returns the note URL.
+    /// Saves a capture to today's daily note or an arbitrary note. Daily templates and named
+    /// sections apply only to the daily note.
     @discardableResult
     func append(content: String, attachments: [URL], ocr: [String: String] = [:], source: SourceInfo? = nil, asTask: Bool = false,
                 heading: String = "", to target: URL? = nil, date: Date = Date()) throws -> URL {
         let cfg = DailyNoteConfig.load(vault: vault)
         let note = target ?? noteURL(for: date)
+        let h = target != nil ? "" : heading.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
+        let exists = fm.fileExists(atPath: note.path)
+        let topOriginal: String? = prependsEntries && h.isEmpty
+            ? (exists ? try NoteTopInsertion.read(note) : (target == nil ? templateContent(cfg, date: date) : ""))
+            : nil
         let noteDir = note.deletingLastPathComponent()
         try fm.createDirectory(at: noteDir, withIntermediateDirectories: true)
         let (embeds, copied) = try copyAttachments(attachments, noteDir: noteDir, ocr: ocr)
-        let entry = format.render(content: content, attachments: embeds, source: source, task: asTask, date: date)
+        var entry = format.render(content: content, attachments: embeds, source: source, task: asTask, date: date)
         let gap = format.isList ? "" : "\n"     // paragraph-style entries need a blank line between them
 
-        let h = target != nil ? "" : heading.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
-        if h.isEmpty, fm.fileExists(atPath: note.path) {
+        var topInsertion: NoteTopInsertion?
+        if var original = topOriginal {
+            let insertion = NoteTopInsertion.plan(in: original, for: entry, isList: format.isList)
+            entry = insertion.normalize(entry)
+            let index = String.Index(utf16Offset: insertion.offset, in: original)
+            original.insert(contentsOf: insertion.wrapping(entry), at: index)
+            try original.write(to: note, atomically: true, encoding: .utf8)
+            topInsertion = insertion
+        } else if h.isEmpty, exists {
             // Append in place instead of rewriting the file: friendlier to Obsidian and sync clients.
             let fh = try FileHandle(forUpdating: note)
             defer { try? fh.close() }
@@ -182,7 +195,7 @@ struct DailyNoteWriter {
             }
             try fh.write(contentsOf: Data(chunk.utf8))
         } else {
-            var out = fm.fileExists(atPath: note.path)
+            var out = exists
                 ? ((try? String(contentsOf: note, encoding: .utf8)) ?? "")
                 : (target == nil ? templateContent(cfg, date: date) : "")
             if h.isEmpty {
@@ -194,7 +207,8 @@ struct DailyNoteWriter {
             }
             try out.write(to: note, atomically: true, encoding: .utf8)
         }
-        History.last = .init(note: note, entry: entry, files: copied, indent: format.isList ? "  " : "", source: source)
+        History.last = .init(note: note, entry: entry, files: copied, indent: format.isList ? "  " : "",
+                             source: source, topInsertion: topInsertion)
         return note
     }
 
@@ -251,8 +265,8 @@ struct DailyNoteWriter {
 
     /// Adds a follow-up thought (and attachments) underneath the last written entry.
     func amend(_ e: History.Entry, text: String, attachments: [URL], ocr: [String: String] = [:]) throws {
-        var current = try String(contentsOf: e.note, encoding: .utf8)
-        guard let r = current.range(of: e.entry, options: .backwards) else { throw CaptureError.entryMissing }
+        var current = try e.readNote()
+        guard let r = e.range(in: current) else { throw CaptureError.entryMissing }
         let (embeds, copied) = try copyAttachments(attachments, noteDir: e.note.deletingLastPathComponent(), ocr: ocr)
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lines = (t.isEmpty ? [] : t.components(separatedBy: "\n")) + embeds
@@ -262,11 +276,11 @@ struct DailyNoteWriter {
                 ? "\n" + lines.joined(separator: "\n") + "\n"                      // standalone note: new paragraph
                 : lines.map { $0.isEmpty ? "" : e.indent + $0 }.joined(separator: "\n") + "\n"
         }
-        let newEntry = e.entry + added
-        current.replaceSubrange(r, with: newEntry)
+        let newEntry = e.entry + (e.topInsertion?.normalize(added) ?? added)
+        current.replaceSubrange(r, with: e.topInsertion?.wrapping(newEntry) ?? newEntry)
         try current.write(to: e.note, atomically: true, encoding: .utf8)
-        History.last = .init(note: e.note, entry: newEntry, files: e.files + copied, indent: e.indent, createdFile: e.createdFile,
-                             source: e.source)
+        History.last = .init(note: e.note, entry: newEntry, files: e.files + copied, indent: e.indent,
+                             createdFile: e.createdFile, source: e.source, topInsertion: e.topInsertion)
     }
 
     /// Inserts `entry` at the end of the section titled `heading` (creating it at the end if absent).
@@ -312,6 +326,17 @@ enum History {
         var createdFile = false
         /// Where the capture came from (kept for the capture log).
         var source: SourceInfo? = nil
+        var topInsertion: NoteTopInsertion?
+
+        func readNote() throws -> String {
+            if topInsertion != nil { return try NoteTopInsertion.read(note) }
+            return try String(contentsOf: note, encoding: .utf8)
+        }
+
+        func range(in text: String) -> Range<String.Index>? {
+            if let topInsertion { return topInsertion.range(of: entry, in: text) }
+            return text.range(of: entry, options: .backwards)
+        }
         var summary: String {
             for line in entry.components(separatedBy: "\n") {
                 let t = line.replacingOccurrences(of: #"^\s*(>\s*)?(\[![\w-]+\].*$)?(- (\[ \] )?)?(\*\*)?(\d{1,2}:\d{2}(\*\*)?( · .*$)?)?\s*(#{1,6}\s+)?(```\S*)?"#,
@@ -332,7 +357,7 @@ enum History {
 
     static func undoLast() throws {
         guard let e = last else { return }
-        let text = try String(contentsOf: e.note, encoding: .utf8)
+        let text = try e.readNote()
         if e.createdFile, text == e.entry {      // the capture created this note: remove the whole file
             try FileManager.default.trashItem(at: e.note, resultingItemURL: nil)
             for f in e.files { try? FileManager.default.trashItem(at: f, resultingItemURL: nil) }
@@ -340,15 +365,15 @@ enum History {
             last = nil
             return
         }
-        if let r = text.range(of: e.entry, options: .backwards) {
+        if let r = e.range(in: text) {
             var out = text
             let atEnd = r.upperBound == text.endIndex
             out.removeSubrange(r)
-            if atEnd {      // drop the blank line that separated the entry
+            if atEnd && e.topInsertion == nil {      // drop the blank line that separated an appended entry
                 while out.hasSuffix("\n\n") { out.removeLast() }
             }
             try out.write(to: e.note, atomically: true, encoding: .utf8)
-        }
+        } else if e.topInsertion != nil { throw CaptureError.entryMissing }
         for f in e.files { try? FileManager.default.trashItem(at: f, resultingItemURL: nil) }
         RecentCaptures.remove(e)
         CaptureLog.remove(e)

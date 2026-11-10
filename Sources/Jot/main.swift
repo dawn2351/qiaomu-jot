@@ -413,7 +413,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             }
             if let recipe { title = "已收录到「\(recipe.displayName)」" }
             let finish = { [weak self] (ocr: [String: String]) in
-                let w = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder)
+                let w = DailyNoteWriter(vault: vault, attachmentOverride: prefs.attachmentFolder,
+                                        prependsEntries: prefs.prependEntries)
                 defer { for d in result.tempDirs { try? FileManager.default.removeItem(at: d) } }
                 History.skipped = []
                 do {
@@ -906,6 +907,73 @@ func selftest() -> Int32 {
     if let created { _ = try? w.append(content: "追加一条", attachments: [], to: created) }
     check("append to note", created.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "",
           "第一段\n\n> Claude\n\n补充\n\n追加一条\n")
+
+    let top = DailyNoteWriter(vault: vault, attachmentOverride: "",
+                              format: fmt(.plain, time: false, source: false), prependsEntries: true)
+    let topNote = vault.appendingPathComponent("置顶.md")
+    let metadata = "\u{FEFF}---\r\naliases: [闪记]\r\n...\r\n\r\n# 笔记 📘\r\n"
+    let older = "相同内容\r\n\r\n已有正文"
+    let original = metadata + older
+    try? Data(original.utf8).write(to: topNote)
+    _ = try? top.append(content: "相同内容", attachments: [], heading: "忽略此标题", to: topNote)
+    let expectedTop = metadata + "\r\n相同内容\r\n\r\n" + older
+    check("writer: prepend after BOM, YAML and title using CRLF",
+          String((try? Data(contentsOf: topNote)) == Data(expectedTop.utf8)), "true")
+    if let last = History.last { try? top.amend(last, text: "新条目的补充", attachments: []) }
+    let expectedAmend = metadata + "\r\n相同内容\r\n\r\n新条目的补充\r\n\r\n" + older
+    check("writer: amend the prepended copy, not the older identical entry",
+          String((try? Data(contentsOf: topNote)) == Data(expectedAmend.utf8)), "true")
+    try? History.undoLast()
+    check("writer: undo prepend restores exact original bytes",
+          String((try? Data(contentsOf: topNote)) == Data(original.utf8)), "true")
+
+    try? "未加标题的正文".write(to: topNote, atomically: true, encoding: .utf8)
+    _ = try? top.append(content: "第一条", attachments: [], to: topNote)
+    _ = try? top.append(content: "第二条", attachments: [], to: topNote)
+    check("writer: untitled note puts newest first", (try? String(contentsOf: topNote, encoding: .utf8)) ?? "",
+          "第二条\n\n第一条\n\n未加标题的正文")
+    try? "旧正文".write(to: topNote, atomically: true, encoding: .utf8)
+    _ = try? top.append(content: "---\nexample: value\n---", attachments: [], to: topNote)
+    check("writer: a captured delimiter stays in the body",
+          (try? String(contentsOf: topNote, encoding: .utf8)) ?? "", "\n---\nexample: value\n---\n\n旧正文")
+    try? History.undoLast()
+    check("writer: undo also removes the delimiter guard",
+          (try? String(contentsOf: topNote, encoding: .utf8)) ?? "", "旧正文")
+    try? "普通标题\n===\n旧正文".write(to: topNote, atomically: true, encoding: .utf8)
+    _ = try? top.append(content: "新正文", attachments: [], to: topNote)
+    check("writer: keep an underlined H1 intact", (try? String(contentsOf: topNote, encoding: .utf8)) ?? "",
+          "普通标题\n===\n\n新正文\n\n旧正文")
+    try? "```\n===\n```\n".write(to: topNote, atomically: true, encoding: .utf8)
+    _ = try? top.append(content: "外面的正文", attachments: [], to: topNote)
+    check("writer: do not insert inside a fenced code block", (try? String(contentsOf: topNote, encoding: .utf8)) ?? "",
+          "外面的正文\n\n```\n===\n```\n")
+
+    let invalid = Data([0xff, 0xfe, 0x00])
+    try? invalid.write(to: topNote)
+    let rejectedInvalid = (try? top.append(content: "新正文", attachments: [], to: topNote)) == nil
+    check("writer: failed UTF-8 read leaves original untouched",
+          String(rejectedInvalid && (try? Data(contentsOf: topNote)) == invalid), "true")
+
+    let templateVault = vault.appendingPathComponent("template-vault")
+    let obsidianConfig = templateVault.appendingPathComponent(".obsidian")
+    try? FileManager.default.createDirectory(at: obsidianConfig, withIntermediateDirectories: true)
+    try? #"{"folder":"Journal","template":"Template"}"#.write(
+        to: obsidianConfig.appendingPathComponent("daily-notes.json"), atomically: true, encoding: .utf8)
+    try? "---\ntype: journal\n---\n# {{title}}\n\n模板内容\n\n## 随记\n旧随记\n".write(
+        to: templateVault.appendingPathComponent("Template.md"), atomically: true, encoding: .utf8)
+    let journal = DailyNoteWriter(vault: templateVault, attachmentOverride: "",
+                                  format: fmt(.plain, time: false, source: false), prependsEntries: true)
+    let testDate = Date(timeIntervalSince1970: 1_700_000_000)
+    let journalFile = try? journal.append(content: "新日记", attachments: [], date: testDate)
+    let journalTitle = MomentFormat.string(testDate, format: "YYYY-MM-DD")
+    let templatePrefix = "---\ntype: journal\n---\n# \(journalTitle)\n\n"
+    let templatedNote = templatePrefix + "新日记\n\n模板内容\n\n## 随记\n旧随记\n"
+    check("writer: render the daily template before prepending",
+          journalFile.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "", templatedNote)
+    _ = try? journal.append(content: "按小节保存", attachments: [], heading: "随记", date: testDate)
+    check("writer: an existing daily section rule still wins",
+          journalFile.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "",
+          templatedNote + "\n按小节保存\n")
 
     // Plain folder vs Obsidian vault conventions, OCR blocks, link titles.
     let png = FileManager.default.temporaryDirectory.appendingPathComponent("qob-ocr-\(UUID().uuidString)/截图 1.png")

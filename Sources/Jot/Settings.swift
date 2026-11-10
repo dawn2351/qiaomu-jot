@@ -24,6 +24,7 @@ final class Prefs: ObservableObject {
     @AppStorage("timestamp") var timestamp: Bool = false
     @AppStorage("openAfterSave") var openAfterSave: Bool = false
     @AppStorage("insertHeading") var insertHeading: String = ""
+    @AppStorage("prependEntries") var prependEntries: Bool = false
     @AppStorage("saveSound") var saveSound: String = "kenney:glass_004"
     @AppStorage("showFormatBar") var showFormatBar: Bool = false
     @AppStorage("didOnboard") var didOnboard: Bool = false
