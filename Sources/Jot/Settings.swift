@@ -13,6 +13,8 @@ enum AppInfo {
 extension KeyboardShortcuts.Name {
     static let capture = Self("capture", default: .init(.j, modifiers: [.command, .shift]))
     static let quickSave = Self("quickSave", default: .init(.k, modifiers: [.command, .shift]))
+    /// No default: ⌘⇧L belongs to browsers' sidebar; the user can pick one in settings.
+    static let records = Self("records")
 }
 
 final class Prefs: ObservableObject {
@@ -77,6 +79,15 @@ final class Prefs: ObservableObject {
         if delta != 0 { UserDefaults.standard.set(n, forKey: key) }
         return n
     }
+    /// Evening review: remind at `reviewMinutes` after midnight; with a model set up, prepare a summary to preview.
+    @AppStorage("reviewEnabled") var reviewEnabled: Bool = true
+    @AppStorage("reviewMinutes") var reviewMinutes: Int = 21 * 60 + 30
+    @AppStorage("reviewAI") var reviewAI: Bool = true
+    @AppStorage("reviewPrompt") var reviewPrompt: String = DailyReview.defaultPrompt
+    /// The user's own prompt, kept while they try the presets.
+    @AppStorage("reviewCustomPrompt") var reviewCustomPrompt: String = ""
+    /// Last day (YYYY-MM-DD) the scheduled review ran; one per day, a missed one runs at the next chance.
+    @AppStorage("lastReviewDay") var lastReviewDay: String = ""
     @AppStorage("draft") var draft: String = ""
     @AppStorage("recentTags") var recentTags: String = ""
     @AppStorage("panelX") var panelX: Double = .nan

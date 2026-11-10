@@ -9,6 +9,7 @@
 | [Geist & Geist Mono](https://github.com/vercel/geist-font) by Vercel and basement.studio | UI fonts (`Resources/Fonts`) | SIL Open Font License 1.1 | [`licenses/Geist-OFL.txt`](licenses/Geist-OFL.txt) |
 | [Lucide](https://lucide.dev) | App icon artwork, menu bar glyph, fallback app glyphs (`Resources/Icons/lucide`, `Resources/AppIcon.icon`) | ISC | [`licenses/Lucide-ISC.txt`](licenses/Lucide-ISC.txt) |
 | [Simple Icons](https://simpleicons.org) | Monochrome brand marks that identify the source app (`Resources/Icons/brands`) | CC0 1.0 | [`licenses/simple-icons-CC0.md`](licenses/simple-icons-CC0.md) |
+| [Lobe Icons](https://github.com/lobehub/lobe-icons) | Monochrome AI provider marks in the AI model settings (`Resources/Icons/ai`; the Gemini mark is from Simple Icons, CC0) | MIT | [`licenses/lobe-icons-MIT.txt`](licenses/lobe-icons-MIT.txt) |
 | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) (via [Calinou/kenney-interface-sounds](https://github.com/Calinou/kenney-interface-sounds)) | Save sounds (`Resources/Sounds`) | CC0 1.0 | [`licenses/Kenney-CC0.txt`](licenses/Kenney-CC0.txt) |
 
 ## Trademarks · 商标

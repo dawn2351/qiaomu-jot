@@ -208,7 +208,7 @@ struct DailyNoteWriter {
             try out.write(to: note, atomically: true, encoding: .utf8)
         }
         History.last = .init(note: note, entry: entry, files: copied, indent: format.isList ? "  " : "",
-                             topInsertion: topInsertion)
+                             source: source, topInsertion: topInsertion)
         return note
     }
 
@@ -225,7 +225,7 @@ struct DailyNoteWriter {
         let content = ([body, embeds.joined(separator: "\n"), sourceLine].filter { !$0.isEmpty }
             .joined(separator: "\n\n")) + "\n"
         try content.write(to: note, atomically: true, encoding: .utf8)
-        History.last = .init(note: note, entry: content, files: copied, indent: "", createdFile: true)
+        History.last = .init(note: note, entry: content, files: copied, indent: "", createdFile: true, source: source)
         return note
     }
 
@@ -280,7 +280,7 @@ struct DailyNoteWriter {
         current.replaceSubrange(r, with: e.topInsertion?.wrapping(newEntry) ?? newEntry)
         try current.write(to: e.note, atomically: true, encoding: .utf8)
         History.last = .init(note: e.note, entry: newEntry, files: e.files + copied, indent: e.indent,
-                             createdFile: e.createdFile, topInsertion: e.topInsertion)
+                             createdFile: e.createdFile, source: e.source, topInsertion: e.topInsertion)
     }
 
     /// Inserts `entry` at the end of the section titled `heading` (creating it at the end if absent).
@@ -324,6 +324,8 @@ enum History {
         /// Continuation indent: "  " under a list entry, "" for a note created by the capture.
         var indent = "  "
         var createdFile = false
+        /// Where the capture came from (kept for the capture log).
+        var source: SourceInfo? = nil
         var topInsertion: NoteTopInsertion?
 
         func readNote() throws -> String {
@@ -350,7 +352,7 @@ enum History {
     static var skipped: [String] = []
 
     static var last: Entry? {
-        didSet { if let e = last { RecentCaptures.record(e) } }
+        didSet { if let e = last { RecentCaptures.record(e); CaptureLog.record(e, previous: oldValue) } }
     }
 
     static func undoLast() throws {
@@ -359,6 +361,7 @@ enum History {
         if e.createdFile, text == e.entry {      // the capture created this note: remove the whole file
             try FileManager.default.trashItem(at: e.note, resultingItemURL: nil)
             for f in e.files { try? FileManager.default.trashItem(at: f, resultingItemURL: nil) }
+            CaptureLog.remove(e)
             last = nil
             return
         }
@@ -373,6 +376,7 @@ enum History {
         } else if e.topInsertion != nil { throw CaptureError.entryMissing }
         for f in e.files { try? FileManager.default.trashItem(at: f, resultingItemURL: nil) }
         RecentCaptures.remove(e)
+        CaptureLog.remove(e)
         last = nil
     }
 }
