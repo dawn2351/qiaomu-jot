@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-enum SourceKind { case browser, mail, notes, pdf, book, code, terminal, finder, other }
+enum SourceKind: String, Codable { case browser, mail, notes, pdf, book, code, terminal, finder, other }
 
 /// Where a capture comes from: the frontmost app plus whatever it can tell us
 /// (page URL and title, PDF file and page, source file name, mail message link).

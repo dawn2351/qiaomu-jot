@@ -3,6 +3,7 @@ import SwiftUI
 import KeyboardShortcuts
 import Combine
 import ServiceManagement
+import UserNotifications
 
 final class CapturePanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -40,7 +41,7 @@ final class CapturePanel: NSPanel {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     private var reopenPanelAfterSettings = false
     private let statusDrop = StatusItemDropTarget()
 
@@ -84,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var statusItem: NSStatusItem!
     private var panel: CapturePanel?
     private var settingsWindow: NSWindow?
+    private var recordsWindow: NSWindow?
+    private var recordsModel: RecordsModel?
     private var model: CaptureModel?
     private var bag = Set<AnyCancellable>()
     private var host: NSHostingView<CaptureView>?
@@ -113,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         KeyboardShortcuts.onKeyUp(for: .capture) { [weak self] in self?.toggle() }
         KeyboardShortcuts.onKeyUp(for: .quickSave) { [weak self] in self?.quickSave() }
+        KeyboardShortcuts.onKeyUp(for: .records) { [weak self] in self?.showRecords() }
+        UNUserNotificationCenter.current().delegate = self
+        ReviewScheduler.shared.start()
         registerRecipes()
         NotificationCenter.default.addObserver(forName: .recipesChanged, object: nil, queue: .main) { [weak self] _ in
             self?.registerRecipes()
@@ -143,6 +149,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     @objc func showAbout() { openSettings(tab: "关于") }
+    @objc func showAISettings() { openSettings(tab: "AI 模型") }
+
+    // MARK: Records & review
+
+    /// Opens 「记录」 on a day; `summarize` starts the AI summary when none is waiting.
+    func showRecords(day: Date = Date(), summarize: Bool = false) {
+        if recordsWindow == nil {
+            let m = RecordsModel(day: day)
+            recordsModel = m
+            recordsWindow = RecordsWindow.make(model: m) { [weak self] in self?.showAISettings() }
+            recordsWindow?.delegate = self
+        }
+        guard let m = recordsModel else { return }
+        m.day = Calendar.current.startOfDay(for: day)
+        m.load()
+        if summarize, m.summary == nil, m.engine != nil { m.summarize() }
+        if panel?.isVisible == true { close() }
+        NSApp.setActivationPolicy(.regular)
+        if #available(macOS 14, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
+        recordsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc func showRecordsAction() { showRecords() }
+    @objc func reviewToday() { showRecords(summarize: true) }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler done: @escaping (UNNotificationPresentationOptions) -> Void) {
+        done([.banner, .sound])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler done: @escaping () -> Void) {
+        let key = response.notification.request.content.userInfo["day"] as? String
+        DispatchQueue.main.async { self.showRecords(day: key.flatMap(DailyReview.day(fromKey:)) ?? Date()) }
+        done()
+    }
     @objc func showScenes() { openSettings(tab: "场景") }
 
     private func openSettings(tab label: String) {
@@ -475,6 +517,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         recentItem.submenu = sub
         menu.addItem(recentItem)
+        add("记录…", #selector(showRecordsAction), symbol: "list.bullet.rectangle").setShortcut(for: .records)
+        add("现在回顾今天", #selector(reviewToday), symbol: "sparkles")
         add(Prefs.shared.isObsidianVault && FolderMode.obsidianInstalled ? "在 Obsidian 中打开今日日记" : "打开今日日记",
             #selector(openToday), symbol: "calendar")
         let undo = add(History.last.map { "撤销「\($0.summary)」" } ?? "撤销上一条记录", #selector(undoLast),
@@ -540,8 +584,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func windowWillClose(_ notification: Notification) {
-        guard (notification.object as? NSWindow) === settingsWindow else { return }
-        NSApp.setActivationPolicy(.accessory)
+        let closing = notification.object as? NSWindow
+        // Back to a menu bar app once neither window is open.
+        let other = closing === settingsWindow ? recordsWindow : settingsWindow
+        if other?.isVisible != true { NSApp.setActivationPolicy(.accessory) }
+        guard closing === settingsWindow else { return }
         if reopenPanelAfterSettings {
             reopenPanelAfterSettings = false
             DispatchQueue.main.async { self.show() }
@@ -563,6 +610,9 @@ func snapshot(_ path: String, text: String, dark: Bool) {
         a.id = "demo-a"; b.id = "demo-b"
         p.recipes = [a, b]
     }   // design snapshots must not change the user's prefs
+    let keepMode = UserDefaults.standard.string(forKey: "aiMode")
+    defer { UserDefaults.standard.set(keepMode, forKey: "aiMode") }
+    if let i = CommandLine.arguments.firstIndex(of: "--ai-mode") { UserDefaults.standard.set(CommandLine.arguments[i + 1], forKey: "aiMode") }
     if CommandLine.arguments.contains("--time-custom") { p.timestamp = true; p.timeFormat = "[记于] HH:mm" }
     let m = CaptureModel(); m.text = text
     let args = CommandLine.arguments
@@ -603,15 +653,21 @@ func snapshot(_ path: String, text: String, dark: Bool) {
            : settingsTab == "scenes" ? NSHostingView(rootView: AnyView(RecipeSettings()))
            : settingsTab == "record" ? NSHostingView(rootView: AnyView(RecordSettings()))
            : settingsTab == "save" ? NSHostingView(rootView: AnyView(SaveSettings()))
+           : settingsTab == "ai" ? NSHostingView(rootView: AnyView(AISettings()))
+           : settingsTab == "gallery" ? NSHostingView(rootView: AnyView(ProviderSheet(start: .gallery) {}))
+           : settingsTab == "editor" ? NSHostingView(rootView: AnyView(ProviderSheet(start: .new(AIPreset.find(args.last ?? "") ?? AIPreset.all[0])) {}))
+           : settingsTab == "review" ? NSHostingView(rootView: AnyView(ReviewSettings()))
+           : settingsTab == "prompt" ? NSHostingView(rootView: AnyView(PromptSheet()))
            : NSHostingView(rootView: AnyView(GeneralSettings())))
+        : args.contains("--records") ? recordsDemo(args)
         : args.contains("--toast")
         ? NSHostingView(rootView: ToastView(title: "已收录到今日日记", detail: "置身事内 - 读书笔记", source: Prefs.sampleSource, style: .success,
                                             actions: [.init(title: "撤销") {}, .init(title: "补充想法") {}, .init(title: "打开") {}], onHover: { _ in }))
         : NSHostingView(rootView: CaptureView(model: m))
     host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-    host.frame = NSRect(origin: .zero, size: host.fittingSize)
+    if !args.contains("--records") { host.frame = NSRect(origin: .zero, size: host.fittingSize) }
     RunLoop.main.run(until: Date().addingTimeInterval(0.4))   // let async layout (auto-grow) settle
-    host.frame = NSRect(origin: .zero, size: host.fittingSize)
+    if !args.contains("--records") { host.frame = NSRect(origin: .zero, size: host.fittingSize) }
     host.layoutSubtreeIfNeeded()
     let bg = NSView(frame: host.frame.insetBy(dx: -30, dy: -30))
     bg.wantsLayer = true
@@ -626,9 +682,43 @@ func snapshot(_ path: String, text: String, dark: Bool) {
     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
 }
 
+/// Sample day for `--snapshot out.png --records [--summary|--empty]`.
+func recordsDemo(_ args: [String]) -> NSView {
+    let m = RecordsModel(); m.preview = !args.contains("--live")
+    if args.contains("--live") {
+        let host = NSHostingView(rootView: RecordsView(model: m))
+        host.frame.size = NSSize(width: 680, height: 1600)
+        return host
+    }
+    func item(_ h: Int, _ min: Int, _ summary: String, app: String? = nil, bundle: String = "", kind: SourceKind = .other,
+              title: String? = nil, note: String = "2026-11-10.md", daily: Bool = true) -> CaptureLog.Item {
+        CaptureLog.Item(id: UUID().uuidString, date: Calendar.current.date(bySettingHour: h, minute: min, second: 0, of: Date())!,
+                        notePath: "/tmp/\(note)", daily: daily, createdFile: false, anchor: "", length: 0, files: [], summary: summary,
+                        sourceApp: app, sourceBundle: bundle, sourceKind: kind, sourceTitle: title, sourceURL: nil, sourceMarkdown: nil)
+    }
+    if !args.contains("--empty") {
+        m.rows = [
+            .init(item: item(9, 12, "", app: "Chrome", bundle: "com.google.Chrome", kind: .browser, title: "置身事内 - 读书笔记"),
+                  text: "地方政府不只是“守夜人”，而是深度参与经济发展的**“运动员”**。"),
+            .init(item: item(11, 40, ""), text: "定价页要不要把年付放第一个？\n\n- [x] 先看竞品怎么排\n- [ ] 搭一个 A/B，先看转化\n- 记得问 [[老王]] 的意见 #产品"),
+            .init(item: item(15, 5, "", app: "Cursor", bundle: "com.todesktop.230313mzl4w4u92", kind: .code, title: "Review.swift",
+                             note: "开发日志.md", daily: false),
+                  text: "回顾功能：总结先预览，确认后再写入。==别自动落盘==。\n\n```swift\ntry DailyReview.write(summary, day: day)\n```"),
+            .init(item: item(20, 47, ""), text: "> 记录工具最难的不是记，是回看。\n\n晚上散步时想到的。\n\n![[访谈录音.m4a]]\n\n> [!note]- 图中文字\n> 所有操作，全部录下"),
+        ]
+    }
+    if args.contains("--summary") {
+        m.summary = "今天你一半心思在《置身事内》，一半在自己的产品上，挺有意思的组合。\n\n- 那句「地方政府是运动员」你特意摘下来了，和你下午琢磨定价其实是一回事：**谁在场上，谁就得算账**。\n- 定价页的年付顺序还没定，明天可以先把 A/B 搭起来。\n\n散步想到的那句很好，「难的是回看」——今晚你就在回看了。"
+    }
+    let host = NSHostingView(rootView: RecordsView(model: m))
+    host.frame.size = NSSize(width: 640, height: args.contains("--summary") ? 860 : 640)
+    return host
+}
+
 /// `Jot --selftest` exercises the Markdown editing commands on a real NSTextView.
 func selftest() -> Int32 {
     RecentCaptures.enabled = false
+    CaptureLog.enabled = false
     var failures = 0
     func run(_ name: String, _ text: String, _ sel: NSRange, _ step: (NSTextView) -> Void, _ expect: String) {
         let tv = NSTextView(); tv.isRichText = false; tv.allowsUndo = true
@@ -697,6 +787,9 @@ func selftest() -> Int32 {
     var code = ctx(.code, app: "Cursor"); code.fileName = "app.py"
     let codeCapture = CaptureFormatter.compose(Grabbed(text: "    def f():\n        return 1\n"), code)
     check("compose: code block", codeCapture.markdown, "```python\ndef f():\n    return 1\n```")
+    check("tone: default is friend", DailyReview.tone(for: DailyReview.defaultPrompt)?.id ?? "", "friend")
+    check("tone: presets round-trip", DailyReview.tones.map { DailyReview.tone(for: $0.prompt + "\n")?.id ?? "" }.joined(separator: ","), DailyReview.tones.map(\.id).joined(separator: ","))
+    check("tone: custom", DailyReview.tone(for: "随便写写") == nil ? "nil" : "x", "nil")
     check("compose: code source", codeCapture.source?.markdown ?? "", "`app.py` · Cursor")
     check("compose: inline code", CaptureFormatter.compose(Grabbed(text: "make build"), code).markdown, "`make build`")
     var pdf = ctx(.pdf, app: "预览"); pdf.fileName = "论文.pdf"; pdf.pdfPage = 3
@@ -906,6 +999,76 @@ func selftest() -> Int32 {
     check("link title: og:title", LinkTitle.parse("<head><meta property=\"og:title\" content=\"置身事内 &amp; 读书\"><title>x</title>") ?? "", "置身事内 & 读书")
     check("link title: <title>", LinkTitle.parse("<title>\n  Hello &#x4E16;&#30028; \n</title>") ?? "", "Hello 世界")
 
+    // Daily review block: replace in place, keep what's around it, undo cleanly.
+    let note0 = "# 日记\n\n第一条\n"
+    let once = DailyReview.replaceBlock("今天不错。", in: note0)
+    check("review: append block", once, "# 日记\n\n第一条\n\n## 今日回顾\n<!-- jot:review -->\n今天不错。\n<!-- /jot:review -->\n")
+    check("review: replace keeps one block", DailyReview.replaceBlock("改过了。", in: once),
+          "# 日记\n\n第一条\n\n## 今日回顾\n<!-- jot:review -->\n改过了。\n<!-- /jot:review -->\n")
+    check("review: remove restores note", DailyReview.removeBlock(from: once), "# 日记\n\n第一条\n")
+    let later = once + "\n后来又记一条\n"
+    check("review: captures after the block survive", DailyReview.replaceBlock("新的。", in: later),
+          "# 日记\n\n第一条\n\n后来又记一条\n\n## 今日回顾\n<!-- jot:review -->\n新的。\n<!-- /jot:review -->\n")
+    check("review: no block untouched", DailyReview.removeBlock(from: "## 今日回顾\n我自己写的\n"), "## 今日回顾\n我自己写的\n")
+    check("review: model heading dropped", DailyReview.clean("## 今日回顾\n\n今天挺好。\n"), "今天挺好。")
+    check("review: first sentence", ReviewScheduler.firstSentence("**今天**你一直在想定价。另外……"), "今天你一直在想定价。")
+
+    // Schedule: today once its time passed, else a missed yesterday; once a day.
+    let cal = Calendar.current
+    let atTime = { (h: Int, m: Int) in cal.date(bySettingHour: h, minute: m, second: 0, of: Date())! }
+    let todayKey = DailyReview.dayKey(Date()), yKey = DailyReview.dayKey(Date().addingTimeInterval(-86400))
+    let twoAgo = DailyReview.dayKey(Date().addingTimeInterval(-86400 * 2))
+    check("schedule: due after time", ReviewScheduler.due(now: atTime(21, 31), minutes: 21 * 60 + 30, last: yKey).map(DailyReview.dayKey) ?? "-", todayKey)
+    check("schedule: not before time", ReviewScheduler.due(now: atTime(21, 0), minutes: 21 * 60 + 30, last: yKey).map(DailyReview.dayKey) ?? "-", "-")
+    check("schedule: catch up yesterday", ReviewScheduler.due(now: atTime(8, 0), minutes: 21 * 60 + 30, last: twoAgo).map(DailyReview.dayKey) ?? "-", yKey)
+    check("schedule: once a day", ReviewScheduler.due(now: atTime(23, 0), minutes: 21 * 60 + 30, last: todayKey).map(DailyReview.dayKey) ?? "-", "-")
+
+    // AI plumbing.
+    check("llm: normalize endpoint", LLMClient.normalize(" https://api.deepseek.com/v1/chat/completions/ "), "https://api.deepseek.com/v1")
+    check("llm: normalize base", LLMClient.normalize("http://127.0.0.1:3425/v1/"), "http://127.0.0.1:3425/v1")
+    check("llm: 401", LLMClient.describe(status: 401, obj: ["error": ["message": "bad key"]], data: Data()).message, "Key 无效或没有权限：bad key")
+    check("llm: 402", LLMClient.describe(status: 402, obj: nil, data: Data()).message, "余额不足")
+    check("llm: strip think", LLMClient.stripThinking("<think>嗯…</think>\n答案"), "答案")
+    check("ai: DeepSeek first", AIPreset.all.first?.id ?? "", "deepseek")
+    check("ai: every preset mark bundled", AIPreset.all.compactMap(\.icon).filter { SourceIcons.image(named: "ai/\($0)") == nil }.joined(), "")
+
+    // Capture log: indexes writes, follows amends, forgets undone entries, reads text back from the note.
+    let logDir = FileManager.default.temporaryDirectory.appendingPathComponent("jot-log-\(UUID().uuidString)")
+    let keepDir = CaptureLog.directory
+    CaptureLog.directory = logDir; CaptureLog.enabled = true
+    defer { CaptureLog.directory = keepDir; CaptureLog.enabled = false; try? FileManager.default.removeItem(at: logDir) }
+    let logW = DailyNoteWriter(vault: sv, attachmentOverride: "", format: fmt(.plain, time: false, source: false))
+    let lsrc = SourceInfo(app: "Chrome", bundleID: "com.google.Chrome", kind: .browser, title: "页", url: URL(string: "https://e.com"))
+    _ = try? logW.append(content: "日志第一条", attachments: [], source: lsrc, to: sv.appendingPathComponent("log.md"))
+    if let last = History.last { try? logW.amend(last, text: "补一句", attachments: []) }
+    var logged = CaptureLog.items(on: Date())
+    check("log: one item after amend", "\(logged.count)|\(logged.first?.sourceApp ?? "")", "1|Chrome")
+    check("log: text from note", logged.first?.text() ?? "", "日志第一条\n\n补一句\n")
+    _ = try? logW.append(content: "第二条", attachments: [], to: sv.appendingPathComponent("log.md"))
+    try? History.undoLast()
+    logged = CaptureLog.items(on: Date())
+    check("log: undo removes", "\(logged.count)", "1")
+    if let u = logged.first?.noteURL { try? "全删了\n".write(to: u, atomically: true, encoding: .utf8) }
+    check("log: deleted in note → hidden", "\(CaptureLog.items(on: Date()).count)", "0")
+    check("records: display strips meta", RecordsModel.displayText("一句话\n![[a.png]]\n> 14:32 · [页](https://e.com)",
+                                                                 source: "[页](https://e.com)"), "一句话\n![[a.png]]")
+    let mdBlocks = MD.parse("---\ntags: x\n---\n# 标题\n段落一\n续行\n\n- [x] 做完\n  - 子项\n1. 第一\n> [!note]- 图中文字\n> OCR\n> 引用\n![[a.png|300]]\n```\ncode\n```")
+    check("markdown: blocks", mdBlocks.map { b -> String in
+        switch b {
+        case .heading(let l, _): return "h\(l)"
+        case .paragraph(let t): return "p(\(t.components(separatedBy: "\n").count))"
+        case .item(let i, let m, _): return "li\(i)" + (m == .task(true) ? "x" : m == .bullet ? "•" : "1")
+        case .callout(_, let t, let f, let body): return "co(\(t),\(f),\(body.count))"
+        case .quote: return "q"
+        case .code: return "code"
+        case .embed(let n): return "img(\(n))"
+        case .table: return "table"
+        case .rule: return "hr"
+        }
+    }.joined(separator: " "), "h1 p(2) li0x li1• li01 co(图中文字,true,1) img(a.png) code")
+    check("records: note minus logged entries", RecordsModel.remainder(of: "早上的\n\n记的一条\n\n晚上手写", without: ["记的一条\n"]), "早上的\n\n晚上手写")
+    check("markdown: inline extras", String(MD.inline("看 [[置身事内|这本书]] 和 ==重点== #读书", size: 13).characters), "看 这本书 和 重点 #读书")
+
     print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
     return failures == 0 ? 0 : 1
 }
@@ -926,6 +1089,39 @@ if let i = CommandLine.arguments.firstIndex(of: "--search"), i + 2 < CommandLine
         done = true
     }
     while !done && Date().timeIntervalSince(t1) < 10 { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    exit(0)
+}
+
+/// `Jot --summarize [YYYY-MM-DD] [cli:<tool> | <baseURL> <model>]`: print a day's review from the shell.
+/// With a base URL the key comes from $JOT_KEY (never stored); with nothing, the default model.
+if let i = CommandLine.arguments.firstIndex(of: "--summarize") {
+    let a = Array(CommandLine.arguments.dropFirst(i + 1))
+    let day = a.first.flatMap(DailyReview.day(fromKey:)) ?? Date()
+    let rest = a.first.flatMap(DailyReview.day(fromKey:)) != nil ? Array(a.dropFirst()) : a
+    var engine = AIStore.current
+    var key: String?
+    if let t = rest.first, t.hasPrefix("cli:"), let tool = LocalCLI.Tool(rawValue: String(t.dropFirst(4))) { engine = .cli(tool) }
+    else if rest.count >= 2 {
+        engine = .http(AIProvider(id: "shell-test", preset: "custom", name: "test", proto: rest.count > 2 && rest[2] == "anthropic" ? .anthropic : .openai,
+                                  baseURL: rest[0], model: rest[1]))
+        key = ProcessInfo.processInfo.environment["JOT_KEY"]
+    }
+    guard let engine else { print("没有可用的模型"); exit(1) }
+    print("模型：\(engine.label)\n素材：\(DailyReview.material(for: day).map { "\($0.count) 条，\($0.text.count) 字" } ?? "无")\n")
+    var done = false
+    Task {
+        do {
+            if case .http(let p) = engine, let key {
+                print("连通测试：\(try await LLMClient.test(p, key: key)) ms")
+                let m = DailyReview.material(for: day)
+                print(try await LLMClient.chat(p, key: key, system: Prefs.shared.reviewPrompt, user: m?.text ?? "今天没有记录"))
+            } else {
+                print(try await DailyReview.summarize(day: day, engine: engine))
+            }
+        } catch { print("出错：\(error.localizedDescription)") }
+        done = true
+    }
+    while !done { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
     exit(0)
 }
 

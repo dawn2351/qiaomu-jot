@@ -75,6 +75,8 @@ enum SettingsWindow {
         tab("场景", "rectangle.stack", RecipeSettings())
         tab("记录", "text.quote", RecordSettings())
         tab("保存", "tray.and.arrow.down", SaveSettings())
+        tab("AI 模型", "sparkles", AISettings())
+        tab("回顾", "moon.stars", ReviewSettings())
         tab("关于", "info.circle", AboutSettings())
         let w = NSWindow(contentViewController: tabs)
         w.styleMask = [.titled, .closable]
